@@ -1,0 +1,84 @@
+Aquifer,Top,Bot,Thick_ft,Description
+Upper aquifer,0,12,12,Topsoil 
+Upper aquifer,12,35,23,coarse sand
+Upper aquifer,35,40,5,clay 
+Upper aquifer,40,50,10,sandy clay
+Upper aquifer,50,57,7,sand 
+Upper aquifer,57,60,3,sandy clay
+Upper aquifer,60,70,10,clay 
+Upper aquifer,70,80,10,sand 
+Upper aquifer,80,90,10,sandy clay
+Upper aquifer,90,95,5,loam 
+Upper aquifer,95,110,15,coarse sand
+Upper aquifer,110,115,5,loam 
+Upper aquifer,115,120,5,clay 
+Upper aquifer,120,125,5,sandy loam
+Upper aquifer,125,140,15,coarse sand
+Upper aquifer,140,155,15,clay 
+Upper aquifer,155,180,25,clay 
+Upper aquifer,180,185,5,coarse sand
+Upper aquifer,185,200,15,clay 
+Upper aquifer,200,210,10,loam 
+Upper aquifer,210,225,15,clay 
+Upper aquifer,225,230,5,sandy clay
+Corcoran,230,245,15,sandy clay
+Corcoran,245,255,10,clay 
+Corcoran,255,260,5,clay 
+Corcoran,260,265,5,sand 
+Corcoran,265,275,10,fine sand
+Corcoran,275,280,5,fine sand
+Corcoran,280,295,15,clay 
+Corcoran,295,300,5,sand 
+Corcoran,300,305,5,clay 
+Corcoran,305,310,5,sandy loam
+Corcoran,310,325,15,sand 
+Corcoran,325,350,25,clay 
+Lower aquifer,350,370,20,sandy clay
+Lower aquifer,370,375,5,loam 
+Lower aquifer,375,379,4,sandy clay
+Lower aquifer,379,395,16,coarse sand
+Lower aquifer,395,405,10,sandy clay
+Lower aquifer,405,420,15,clay 
+Lower aquifer,420,438,18,sandy clay
+Lower aquifer,438,445,7,coarse sand
+Lower aquifer,445,450,5,sand 
+Lower aquifer,450,460,10,loam 
+Lower aquifer,460,470,10,sand 
+Lower aquifer,470,485,15,sandy clay
+Lower aquifer,485,490,5,coarse sand
+Lower aquifer,490,492,2,clay 
+Lower aquifer,492,497,5,coarse sand
+Lower aquifer,497,525,28,clay 
+Lower aquifer,525,532,7,coarse sand
+Lower aquifer,532,535,3,clay 
+Lower aquifer,535,540,5,sandy clay
+Lower aquifer,540,545,5,sandy loam
+Lower aquifer,545,560,15,sandy clay
+Lower aquifer,560,570,10,coarse sand
+Lower aquifer,570,575,5,sandy clay
+Lower aquifer,575,580,5,sand 
+Lower aquifer,580,585,5,clay 
+Lower aquifer,585,590,5,sandy clay
+Lower aquifer,590,595,5,sand 
+Lower aquifer,595,605,10,clay 
+Lower aquifer,605,610,5,coarse sand
+Lower aquifer,610,635,25,clay 
+Lower aquifer,635,660,25,coarse sand
+Lower aquifer,660,695,35,blue clay
+Lower aquifer,695,705,10,sandy clay
+Lower aquifer,705,710,5,clay 
+Lower aquifer,710,720,10,sandy clay
+Lower aquifer,720,750,30,clay 
+Lower aquifer,750,755,5,sandy clay
+Lower aquifer,755,760,5,fine sand
+Lower aquifer,760,765,5,clay 
+Lower aquifer,765,770,5,clay 
+Lower aquifer,770,780,10,clay 
+Lower aquifer,780,785,5,sandy clay
+Lower aquifer,785,800,15,sandy clay
+Lower aquifer,800,805,5,sandy clay
+Lower aquifer,805,825,20,coarse sand
+Lower aquifer,825,835,10,clay 
+Lower aquifer,835,840,5,coarse sand
+Lower aquifer,840,855,15,clay 
+Lower aquifer,855,860,5,clay 
