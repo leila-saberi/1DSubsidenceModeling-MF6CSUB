@@ -1,0 +1,21 @@
+name: dwr_subsidence
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+- python=3.9
+- scipy
+- pandas>=2.0
+- numpy>=1.25,<2.0
+- openpyxl
+- geopandas
+- matplotlib
+- pip
+- libblas
+- pytest
+- pip:
+  - pypestutils
+  - xlrd
+  - openpyxl
+
+
