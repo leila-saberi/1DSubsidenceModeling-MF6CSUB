@@ -57,7 +57,7 @@ def main(
     """
   
     if sites is None:
-        sites = ["T88", "J88", "GWM_14","341.804",  "H201"]
+        sites = ["T88", "212.8"]
     else:
         if isinstance(sites, str):
             sites = [sites]
