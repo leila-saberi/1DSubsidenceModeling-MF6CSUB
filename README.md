@@ -1,3 +1,45 @@
+Overview This release provides a fully functional 1D subsidence modeling framework for five benchmark sites within the Central Valley of California, built using MODFLOW 6 with the CSUB package. The repository integrates PEST-PyEMU for ensemble-based data assimilation and model calibration, enabling robust estimation of critical heads and projection of future subsidence under various groundwater management scenarios.
+
+Key Features:
+
+MODFLOW 6-CSUB Implementation: Simulates both elastic and inelastic compaction of aquifer-system interbeds, with support for delay and no-delay beds.
+
+Critical Head Estimation: Automated analysis to determine the critical groundwater levels below which permanent (inelastic) subsidence occurs.
+
+Calibration Workflow: A complete PEST-PyEMU calibration pipeline (via workflow.py and ies-functions.py) to minimize error between simulated and observed subsidence using:
+
+ - InSAR data
+
+ - Extensometer data
+
+ - Historical groundwater levels
+Pre-processing and Data Handling: Scripts (prep_data.py, model_functions.py) for:
+
+Cleaning and resampling observed groundwater data
+
+Generating GHB head boundaries with autocorrelations and vertical bias adjustments
+
+Grouping interbeds by thickness quantiles
+
+Repository Contents
+
+workflow.py: Orchestrates the modeling workflow (pre-processing, calibration, prediction).
+
+ies-functions.py: Implements data assimilation and objective function calculations.
+
+model_functions.py: Contains MODFLOW 6-CSUB and GHB setup utilities.
+
+prep_data.py: Prepares and processes observational data for calibration and validation.
+
+Applications
+
+SGMA Compliance: Supports Sustainable Management Criteria (SMC) development.
+
+Risk Assessment: Provides insight into subsidence impacts on infrastructure under different management strategies.
+
+Research and Teaching: Demonstrates the capabilities of MODFLOW 6-CSUB for both site-specific and regional studies.
+
+
 # Getting Started
 1. Install Miniforge
 
@@ -26,4 +68,5 @@
 5.  Run the project script:
     ```
     python DWR.py
+
     ```
