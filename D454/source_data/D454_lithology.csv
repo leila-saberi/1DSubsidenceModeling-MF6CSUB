@@ -1,0 +1,38 @@
+Aquifer,Top,Bot,Thick_ft,Description
+upper aquifer,0,137,137,clay
+upper aquifer,137,200,63,clay
+upper aquifer,200,220,20,clay
+upper aquifer,220,222,2,sand
+upper aquifer,222,280,58,clay
+upper aquifer,280,300,20,clay
+upper aquifer,300,335,35,clay
+lower aquifer,335,438,103,sand
+lower aquifer,438,560,122,clay
+lower aquifer,560,570,10,sand
+lower aquifer,570,600,30,clay
+lower aquifer,600,636,36,clay
+lower aquifer,636,652,16,clay
+lower aquifer,652,700,48,clay
+lower aquifer,700,702,2,sand
+lower aquifer,702,732,30,clay
+lower aquifer,732,750,18,clay
+lower aquifer,750,780,30,clay
+lower aquifer,780,788,8,sand
+lower aquifer,788,833,45,clay
+lower aquifer,833,839,6,sand
+lower aquifer,839,880,41,clay
+lower aquifer,880,886,6,sand
+lower aquifer,886,891,5,clay
+lower aquifer,891,950,59,clay
+lower aquifer,950,953,3,sand
+lower aquifer,953,983,30,clay
+lower aquifer,983,1028,45,clay
+lower aquifer,1028,1068,40,clay
+lower aquifer,1068,1077,9,sand
+pliocene,1077,1145,68,clay
+pliocene,1145,1205,60,clay
+pliocene,1205,1235,30,clay
+pliocene,1235,1328,93,clay
+pliocene,1328,1334,6,clay
+pliocene,1334,1387,53,clay
+pliocene,1387,1400,13,clay
