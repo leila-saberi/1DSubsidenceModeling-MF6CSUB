@@ -9,6 +9,8 @@ sys.path.insert(0,os.path.abspath(os.path.join('dependencies')))
 import pyemu
 import model_functions
 import ies_functions
+import pastas_workflow
+
 
 def _prep(site_name,use_delay,org_dir,num_reals,obs_file,tpl_dir,
           use_focus_weights,use_obs_diff,prepfunc_kwargs,freq,
@@ -16,17 +18,25 @@ def _prep(site_name,use_delay,org_dir,num_reals,obs_file,tpl_dir,
           wl_sample,estimate_clay_thickness,
           specified_initial_interbed_state,
           assimilate_all,prefer_less_rebound,
-          prefer_less_delayedfuture):
+          prefer_less_delayedfuture,include_pastas,
+          head_based,pcs0_range,tie_ib_by_layer,run_mod_fxn):
+
 
     model_functions.build_model(site_name,prerun=True,use_delay=use_delay,
                                 prepfunc_kwargs=prepfunc_kwargs,freq=freq,
                                 start_datetime=start_datetime,wl_sample=wl_sample,
-                                specified_initial_interbed_state=specified_initial_interbed_state)
+                                specified_initial_interbed_state=specified_initial_interbed_state,
+                                head_based=head_based)
+    # if include_pastas:
+    #     model_functions.pastas_get_model(site_name, buffer_miles=2, rfunc="hantush")
+
 
     # BUILD PEST INTERFACE
     ies_functions.setup_pst(org_d=org_dir, site_name=site_name, template_ws=tpl_dir,num_reals=num_reals,
-        include_ghb_pars=include_ghb_pars,estimate_clay_thickness=estimate_clay_thickness)
-  
+        include_ghb_pars=include_ghb_pars,estimate_clay_thickness=estimate_clay_thickness,
+                            include_pastas=include_pastas,pcs0_range=pcs0_range,
+                            tie_ib_by_layer=tie_ib_by_layer) # todo
+    
     # ASSIGN STANDARD DEVIATION TO OBS
     ies_functions.set_obsvals_and_weights(obs_file,t_d=tpl_dir,num_reals=num_reals,
         use_focus_weights=use_focus_weights,use_obs_diff=use_obs_diff,
@@ -35,7 +45,8 @@ def _prep(site_name,use_delay,org_dir,num_reals,obs_file,tpl_dir,
                                           prefer_less_rebound=prefer_less_rebound,
                                           prefer_less_delayedfuture=prefer_less_delayedfuture)
 
-    ies_functions.try_run_modify_pst_fxn(site_name,tpl_dir)
+    if run_mod_fxn:
+        ies_functions.try_run_modify_pst_fxn(site_name,tpl_dir)
     
 
 def _run(master_dir,tpl_dir,noptmax,num_reals,num_workers,port,usecondor=False):
@@ -59,13 +70,15 @@ def analyze_site(site_name,org_dir=None,tpl_dir=None,
                  use_focus_weights=True, ht_directions=None,
                  experiment_tag="",use_obs_diff=False, prepfunc_kwargs={},
                  port=4004,freq="Y",start_datetime=None,verification_window=None,
-                 include_ghb_pars=True,wl_sample="mean",run_scenarios=False,plot_scens=False,
+                 include_ghb_pars=True,wl_sample="mean",run_scenarios=True,plot_scens=False,
                  scenario_subset=None,estimate_clay_thickness=False,usecondor=False,
                  scenario_tag="",scenariofiles=[],run_prior_scenarios=False,
                  export_scenario_basereals=True,morris_scenario_name=None,
                  specified_initial_interbed_state=True,xfer_from_m_d=None,
                  assimilate_all=False,prefer_less_rebound=1e-20,
-                 prefer_less_delayedfuture=False):
+                 prefer_less_delayedfuture=False,
+                 include_pastas=False,head_based=False,pcs0_range=200,
+                 tie_ib_by_layer=True,run_mod_fxn=True):
 
     if verification_window is not None:
         assert len(verification_window) == 2
@@ -107,6 +120,23 @@ def analyze_site(site_name,org_dir=None,tpl_dir=None,
         if prefer_less_delayedfuture:
             master_dir += "_lessfuture"
 
+        if head_based:
+            master_dir += "_headbased"
+        else:
+            master_dir += "_stressbased"
+        if tie_ib_by_layer == "all":
+            master_dir += "_ibtieall"
+        elif tie_ib_by_layer is True:
+            master_dir += "_ibbylayer"
+        else:
+            master_dir += "_noibbylayer"
+
+        if run_mod_fxn:
+            master_dir += "_modfxn"
+        else:
+            master_dir += "_nomodfxn"
+
+
         # exp tag
         assert len(experiment_tag) > 0, "set an experiment tag!"
         # if len(experiment_tag) == 0:
@@ -126,18 +156,20 @@ def analyze_site(site_name,org_dir=None,tpl_dir=None,
         print(f"transfer master dir from {xfer_from_m_d}")
 
     if prep:
-        _prep(site_name,use_delay,org_dir,num_reals,obs_file,tpl_dir,use_focus_weights,use_obs_diff,
-              prepfunc_kwargs,freq,start_datetime,verification_window,include_ghb_pars,wl_sample,
-              estimate_clay_thickness,specified_initial_interbed_state,assimilate_all,
-              prefer_less_rebound,prefer_less_delayedfuture)
+        _prep(site_name,use_delay,org_dir,num_reals,obs_file,tpl_dir,
+          use_focus_weights,use_obs_diff,prepfunc_kwargs,freq,
+          start_datetime,verification_window,include_ghb_pars,
+          wl_sample,estimate_clay_thickness,
+          specified_initial_interbed_state,
+          assimilate_all,prefer_less_rebound,
+          prefer_less_delayedfuture,include_pastas,
+          head_based,pcs0_range,tie_ib_by_layer,run_mod_fxn)
 
         if xfer_from_m_d is not None:
             ies_functions.xfer_from_m_d(tpl_dir,xfer_from_m_d)
 
-
-
     if run:
-       _run(master_dir, tpl_dir, noptmax, num_reals, num_workers, port, usecondor=usecondor)
+       ies_m_d = _run(master_dir, tpl_dir, noptmax, num_reals, num_workers, port, usecondor=usecondor)
 
        #ies_functions.export_realizations_to_dirs(tpl_dir,master_dir,
        # real_name_tag="",noptmax=None,just_mf6=True)
@@ -151,11 +183,13 @@ def analyze_site(site_name,org_dir=None,tpl_dir=None,
                                               num_workers=num_workers,
                                               scenario_name=None,plusplus_kwargs={"gsa_morris_p":10,"gsa_morris_r":10})
         ies_functions.plot_morris_delaydif_summary(morris_m_d)
+        if os.path.exists(master_dir):
+            ies_functions.plot_morris_delaydif_summary2(master_dir,morris_m_d)
 
     if run_scenarios:
 
         assert os.path.exists(master_dir), f"{master_dir} not found"
-        # prep_CH_scen_Input(site_name)
+        prep_CH_scen_Input(site_name)
         
         # if len(scenario_tag) == 0:
         #     scenario_tag = "_scenarios"
@@ -329,6 +363,12 @@ def gather_pngs(sites, dest_d = "figures",combine_to_one=False):
                     shutil.copy2(src_f, dest_fcombined)
 
 def get_water_levels_minrolled(tsdf):
+    # .rolling(): apply rolling window on dataframe with:
+    #     window size = 90 (days)
+    #     center=True: centered on the current value
+    #     min_periods=1: at least 1 non-NaN value required within the window for computation
+    # .min(): then get the minimum value within each rolling window
+    # .dropna(): then drop nans
     tsdf = tsdf.rolling(90,center=True,min_periods=1).min().dropna()
     return tsdf
 
@@ -453,7 +493,7 @@ def prep_scenario_csv_general(location, scenariofile):
 
     scen_df = pd.DataFrame(scen_dict, index=dates)
     scen_df.index.name = "datetime"
-    scen_df = scen_df.ffill()
+    scen_df = scen_df.ffill() # fill nan values by propagating the last valid observation to next valid
     scen_df.dropna(axis=0, how="all", inplace=True)
 
     if scenariofile == "CH_forecast":
@@ -473,13 +513,116 @@ def prep_scenario_csv_general(location, scenariofile):
         scen_names_ch = [s for s in scen_df.columns if any(f'k:{i}' in s for i in kvals_ch)]
         scen_df = scen_df[scen_names_ch]
 
+        # load scenario data and get layer names
+        # scen_dfcheck = pd.read_excel(os.path.join(location, "source_data", f"{location}_scenario_data.xlsx"), header=None)
+        # layscheck = scen_dfcheck.iloc[0, 1:].str.lower().replace("plioscene","pliocene").unique().tolist()
+        # assert all([s in lith_dict.keys() for s in layscheck]), f"an aquifer name in scenario_data is not recorded in kdict"
+
+    # if ("composite" in scen_lays) or (scenariofile == "CH_forecast" and "composite" in layscheck):
+    #
+    #     # don't track composite layer in scenarios
+    #     if ("composite" in scen_lays):
+    #         lays_nocomp = [s for s in scen_lays if s != "composite"]
+    #     else:
+    #         lays_nocomp = [s for s in scen_lays if s != "layer_2"] # "composite" layer = layer 2 (see kdict)
+    #     assert len(lays_nocomp) < len(scen_lays)
+    #     kvals_nocomp = [kdict[s] for s in lays_nocomp]
+    #     # only keep scenario names that contain 'k:{i}' for i in kvals_new
+    #     scen_names_ch = [s for s in scen_df.columns if any(f'k:{i}' in s for i in kvals_nocomp)]
+    #     scen_df = scen_df[scen_names_ch]
+
     print(f"columns names: {scen_df.columns.tolist()}")
     if not os.path.exists(os.path.join(location, "processed_data")):
         os.mkdir(os.path.join(location, "processed_data"))
     scen_df.to_csv(os.path.join(location, "processed_data", f"{location}.scenarios.csv"))
 
+def testing_scanlayers(scenario_dict):
+    sites = [subdir for subdir in next(os.walk('.'))[1] if subdir not in
+             [".git", ".idea", "__pycache__", "bin", "CSUB_example", "CVHM2", "dependencies", "etc", "gis", "log",
+              "temp", "THmodel", "Tule"]]
+
+    testdic = scenario_dict.copy()
+    testdic["obs_data"] = "obs_data"
+    testdic["par_data"] = "par_data"
+    testdic["lithology"] = "lithology"
+
+    lay_dic = {}
+    lay_dic_u = {}
+    for tag, file in testdic.items():
+        print(tag)
+        lays_u = []
+        lay_dic_temp = {}
+        for location in sites:
+            # check for file
+            if (file == "obs_data") or (file == "lithology"):
+                fpath = os.path.join(location, "source_data", f"{location}_{file}.csv")
+            else:
+                fpath = os.path.join(location, "source_data", f"{location}_{file}.xlsx")
+
+            if not os.path.exists(fpath):
+                print(f"no file for {location}")
+
+            else:
+                # if file exists, read lay names
+                if file == "obs_data":
+                    lays = pd.read_csv(fpath, index_col=0)["Aquifer"].str.lower().dropna().unique().tolist()
+                elif file == "lithology":
+                    lays = pd.read_csv(fpath).dropna(axis=1,how="all").dropna(axis=0).Aquifer.str.lower().unique()
+                    lays = [s.replace(" ", "").replace("aquifer", "") for s in lays]
+                elif file == "par_data":
+                    lays = pd.read_excel(fpath).columns.str.lower().tolist()
+                    # truncate to exclude the first occurrence of 'parameter' and keep values after it
+                    lays = lays[lays.index('parameter') + 1:]
+                    # remove all values after the first occurrence of a value containing 'unnamed'
+                    if any("unnamed" in s for s in lays):
+                        lays = [x for x in lays if not ('unnamed' in x)][0:lays.index(next(x for x in lays if 'unnamed' in x))]
+                else:
+                    lays = pd.read_excel(fpath, header=None).iloc[0, 1:].str.lower().unique().tolist()
+                lays = [lay for lay in lays if pd.notna(lay)]
+                lays = [s.strip() for s in lays]
+                lay_dic_temp[location] = lays
+                lays_u.extend([s for s in lays if s not in lays_u])
+                # assert all(s in kdict for s in lays_u), f"an aquifer name in {file} is not recorded in kdict"
+
+        lay_dic[tag] = lay_dic_temp
+        lay_dic_u[tag] = lays_u
+
+    with open(os.path.join(".", "testing_scanlayers.txt"), 'w') as f:
+        for key, value in lay_dic.items():
+            f.write(f"-------------------------------- {key}\n")
+            for k, v in value.items():
+                f.write(f"{k}: " + ", ".join(v) + "\n")
+            f.write(f"UNIQUE: " + ", ".join(lay_dic_u[key]) + "\n")
+
+def testing_prep_scen_csv(scenario_dict):
+
+    sites = [subdir for subdir in next(os.walk('.'))[1] if subdir not in
+             [".git", ".idea", "__pycache__", "bin", "CSUB_example", "CVHM2", "dependencies", "etc", "gis", "log",
+              "temp", "THmodel", "Tule"]]
+
+    with open(os.path.join(".", "testing_prep_scen_csv.txt"), 'w') as f:
+        for site in sites:
+            f.write(f"-------------------------------- {site}\n")
+            for scenario_tag, scenariofile in scenario_dict.items():
+                    if os.path.exists(os.path.join(site, "source_data", f"{site}_{scenariofile}.xlsx")):
+                        # prep the scenario csv
+                        try:
+                            # Redirect print statements to the file
+                            original_stdout = sys.stdout  # Save the original stdout
+                            sys.stdout = f  # Redirect to file
+                            prep_scenario_csv_general(site, scenariofile)
+                            # Restore the original stdout
+                            sys.stdout = original_stdout
+                            f.write(f"SUCCESS for {scenariofile}\n\n")
+                        except Exception as e:
+                            # Restore stdout and log failure
+                            sys.stdout = original_stdout
+                            f.write(f"FAILURE for {scenariofile}: {e}\n\n")
+    # Reset sys.stdout to default
+    sys.stdout = sys.__stdout__
 
 def prep_CH_scen_Input(site):
+
 
     m_ds = []
     dd = [os.path.join(site, dd) for dd in os.listdir(os.path.join(site)) if
@@ -763,13 +906,27 @@ def make_archives(sites,tag=None):
 
 if __name__ == "__main__":
     
-    sites = ["J88","T88"]
+    sites = ["J88","Q288","T88","OCTOL"]
     num_workers = 35
     num_reals = 1000
     noptmax = 5
     use_focus_weights = False
     local=True
-
+    #try_analysis_for_sites(site_names,num_workers,num_reals,noptmax,use_focus_weights=use_focus_weights)
+    # for site_name in sites:
+    #     analyze_site(site_name,num_reals=num_reals,noptmax=noptmax,num_workers=num_workers,run=False,
+    #         prep=True,plot=False,use_delay=True,use_focus_weights=use_focus_weights,include_ghb_pars=True,
+    #         local=local)
+    #     break
+    # use_focus_weights = True
+    # #try_analysis_for_sites(site_names,num_workers,num_reals,noptmax,use_focus_weights=use_focus_weights)
+    # for site_name in sites:
+    #     analyze_site(site_name,num_reals=num_reals,noptmax=noptmax,num_workers=num_workers,run=True,
+    #         prep=True,plot=True,use_delay=True,use_focus_weights=use_focus_weights)
+    # gather_pdfs()
+    # gather_csvs(sites=['H201', 'GWM_14'])
+    # gather_pdfs(sites=['H201', 'GWM_14'])
+    prep_CH_scen_Input('EARLIMART')
         
         
     

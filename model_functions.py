@@ -15,8 +15,6 @@ import matplotlib as mpl
 import os,datetime
 import shutil 
 from flopy.plot.styles import styles
-import statistics 
-
 
 """
 To Do:
@@ -31,7 +29,7 @@ if sys.platform.startswith('win'):
     assert "dependencies" in flopy.__file__
     bin_path = os.path.join("bin","win")
     bin_name = "mf6.exe"
-    
+
 elif sys.platform.startswith('linux'):
     assert "dependencies" in pyemu.__file__
     assert "dependencies" in flopy.__file__
@@ -47,26 +45,30 @@ else:
     raise Exception('***ERROR: OPERATING SYSTEM UNKOWN***')
 
 def initialize_model(location,freq="Y",start_datetime=None,wl_sample="mean",
-                     specified_initial_interbed_state=True):
+                     specified_initial_interbed_state=True,
+                     head_based=False):
     w_d = os.path.join(location)
     prop_df = pd.read_csv(os.path.join(w_d,"processed_data","{0}.model_property_data.csv".format(location)),index_col=0)
     org_gwelev_df = pd.read_csv(os.path.join(w_d,'processed_data','{0}.ts_data.csv'.format(location)),index_col=0, parse_dates=True)
     sub_df = pd.read_csv(os.path.join(w_d,"source_data","{0}_sub_data.csv".format(location)),index_col=0,parse_dates=True)
 
     prop_df.columns = [int(c) for c in prop_df.columns]
-    assert prop_df.dropna().shape == prop_df.shape
+
     
     for idx in prop_df.index:
         try:
             prop_df.loc[idx,:] = prop_df.loc[idx,:].astype(float)
         except Exception as e:
             pass
+
     gwelev_dfs = {}
     kvals = org_gwelev_df.klayer.unique()
     kvals.sort()
     udts = set()
     start_passed = True
-    if start_datetime is None:
+
+    # model start_datetime is assigned here
+    if start_datetime is None: # -> assign the date with the 1st occurrence of a gw level obs OR a subsidence obs
         start_datetime = min(sub_df.index.min(),org_gwelev_df.index.min())
         start_passed = False
     if isinstance(start_datetime,str):
@@ -74,29 +76,38 @@ def initialize_model(location,freq="Y",start_datetime=None,wl_sample="mean",
     udts.update(set([start_datetime - pd.to_timedelta(1,unit='d')]))
     # print(start_datetime)
     # exit()
+
     for kval in kvals:
+        # read in processed gw level observations
         kdf = org_gwelev_df.loc[org_gwelev_df.klayer==kval,["interpolated"]].copy()
         kdf.sort_index(inplace=True)
+        # resample starting from model start_datetime
         historic_dts = pd.date_range(start_datetime,kdf.index.max(),freq='d')
         kdf = kdf.reindex(historic_dts,method="nearest")
 
         if start_passed:
             kdf = kdf.loc[kdf.index>=start_datetime]
-        if wl_sample.strip().lower() == "mean":
+        # resample to the specified frequency, and...
+        if wl_sample.strip().lower() == "mean": # ...take the mean of values within each resampled period
             kdf_resample = kdf.resample(freq).mean().interpolate(method='time').ffill().bfill()
-        elif wl_sample.strip().lower() == "min":
+        elif wl_sample.strip().lower() == "min": # ...take the minimum of values within each resampled period
             kdf_resample = kdf.resample(freq).min().interpolate(method='time').ffill().bfill()
         else:
             raise Exception("unsupported 'wl_sample' arg: '{0}'".format(wl_sample))
         gwelev_dfs[kval] = kdf_resample
+        # update udts by adding unique datetime values
         udts.update(set(kdf_resample.index.tolist()))
+
+    # update historic dates
     historic_dts = list(udts)
     historic_dts.sort()
     
     historic_dts = pd.DatetimeIndex(historic_dts)
+    # perlen: calculate the time differences (in days) between consecutive datetime values in historic_dts
     historic_perlen = list((historic_dts[1:] - historic_dts[:-1]).days.values)
     historic_perlen.insert(0,1)
 
+    # get number of model layers
     nlay = prop_df.columns.max() + 1
 
     # Define the spatial discretization
@@ -105,9 +116,13 @@ def initialize_model(location,freq="Y",start_datetime=None,wl_sample="mean",
     top = prop_df.loc["top",:].max() 
     botm = prop_df.loc["botm",:].values
     nstp = 1
+    # create the prediction date range, at the specified frequency
     pred_end = pd.to_datetime("12-31-2060")
     pred_drange = pd.date_range(historic_dts.max(),pred_end,freq=freq)
+    # perlen: calculate the time differences (in days) between consecutive datetime values in perlen_pred
     perlen_pred = (pred_drange[1:] - pred_drange[:-1]).days.values
+
+    # fill in tdis perioddata and ghb stress_period_data
     perioddata = []
     ghbdata = {}
     steady_state = {}
@@ -120,30 +135,33 @@ def initialize_model(location,freq="Y",start_datetime=None,wl_sample="mean",
     sim_start_datetime = historic_dts.min().strftime('%Y-%m-%d')
     steady_state[0] = True
     transient[1] = True
-    # Initialize CHD with the first time step
+
+    # Initialize GHB with the first time step
     cond = 50000
     ghbspdata = []
     last_dict = {}
     #for k,h in zip(gwelev_df.columns.values,gwelev_df.iloc[0,:].values):
     for k in range(nlay):
-        if k not in gwelev_dfs:
+        if k not in gwelev_dfs: # only define ghb spd for layers with gw level observations
             continue
         df = gwelev_dfs[k]
-        h = df.interpolated.iloc[0]
-        ghbspdata.append(((k,0,0),h, cond))
+        h = df.interpolated.iloc[0] # get processed gw level obs at the model start_datetime
+        ghbspdata.append(((k,0,0),h, cond)) # (lay,row,col,ghb head,ghb conductance)
         last_dict[k] = (0, ghbspdata[-1])
         print(k,h)
- 
     ghbdata[0] = ghbspdata
+
+    # fill in historical period first
     ghb_warnings = []
     tol = 0.1 #hard coded in ies functions also
     for kper,(dt,perlen) in enumerate(zip(historic_dts,historic_perlen)):
         ghbspdata = []
         perioddata.append((perlen,nstp,1))
         for k in range(nlay):
-            if k not in gwelev_dfs:
+            if k not in gwelev_dfs: # only define ghb condition for layers with gw level observations
                 continue
             df = gwelev_dfs[k]
+            # if there is no gw level observation for this date, reuse ghb head from previous kper
             if dt not in df.index:
                 ghbspdata.append(last_dict[k][1])
                 print("WARNING: filling missing ghb data for kper {0} and layer {1}, dt:{2}".format(kper+1,k+1,str(dt)))
@@ -172,6 +190,7 @@ def initialize_model(location,freq="Y",start_datetime=None,wl_sample="mean",
     kvals.sort()
     #ghbdata[kper+1] = [last_dict[k][1] for k in kvals]
 
+    # then fill in predictive period (reuse ghb head from last historical kper) # todo cc THIS IS WHERE/HOW PASTAS HEADS WILL BE?
     kper += 1
     for kper_pred,perlen in enumerate(perlen_pred):
         perioddata.append((perlen,nstp,1))
@@ -179,6 +198,7 @@ def initialize_model(location,freq="Y",start_datetime=None,wl_sample="mean",
     print(len(ghbdata), kper)
     assert len(perioddata) == kper + len(perlen_pred)
     assert len(ghbdata) == len(perioddata)
+
     # Solver parameters
     nouter = 300
     ninner = 200
@@ -189,27 +209,39 @@ def initialize_model(location,freq="Y",start_datetime=None,wl_sample="mean",
     
     
     ndelaycells = 19
-    ninterbeds = nlay
+    matching_rows = prop_df[prop_df.index.str.contains("thick_frac_")]
+    unique_matching_rows = matching_rows.index.unique()
+    ninterbeds = 0
+    for tag in unique_matching_rows:
+        ninterbeds += prop_df.loc[tag].count()
+
+    # ninterbeds = prop_df.index.astype(str).str.contains("thick_frac_").sum()
     
     
     update_material_properties = False
     #if "delay" not in prop_df.loc["cdelay",:].str.lower():
     #    update_material_properties = False
     sub6 = []
+    kk = 0
     for k in range(nlay):
         ['icsubno','k','ic','jc','cdelay','pcs0','thick_frac','rnb','ssv_cc','sse_cr','theta','ib_kv','h0']    
-        ksub6 = [k,(k,0,0)]
-        ksub6.append(prop_df.loc['cdelay',k])
-        ksub6.append(prop_df.loc['pcs0',k])
-        ksub6.append(prop_df.loc['thick_frac',k])
-        ksub6.append(prop_df.loc['rnb',k])
-        ksub6.append(prop_df.loc["ssv_cc",k])
-        ksub6.append(prop_df.loc["sse_cr",k])
-        ksub6.append(prop_df.loc["theta",k])
-        ksub6.append(prop_df.loc["kv",k])
-        ksub6.append(prop_df.loc["h0",k])
-        
-        sub6.append(ksub6)
+        for tag in unique_matching_rows:
+            postfix = tag.replace("thick_frac_", "")
+            if not pd.isnull(prop_df.loc[f"thick_frac_{postfix}", k]):
+                ksub6 = [kk, (k, 0, 0)]
+                ksub6.append(prop_df.loc['cdelay',k])
+                # ksub6.append(prop_df.loc['pcs0',k])
+                ksub6.append(0.0)
+                ksub6.append(prop_df.loc[f"thick_frac_{postfix}",k])
+                ksub6.append(prop_df.loc[f"rnb_{postfix}", k])
+                ksub6.append(prop_df.loc["ssv_cc",k])
+                ksub6.append(prop_df.loc["sse_cr",k])
+                ksub6.append(prop_df.loc["theta",k])
+                ksub6.append(prop_df.loc["kv",k])
+                ksub6.append(prop_df.loc["h0",k])
+                
+                sub6.append(ksub6)
+                kk += 1
     
     # Set up the model
     modelname = "model"#f"{location}.{scenario}" if scenario is not None else f"{location}.historical"
@@ -266,10 +298,15 @@ def initialize_model(location,freq="Y",start_datetime=None,wl_sample="mean",
             print("empty ghb info for stress period ",iper+1)
     ghb = flopy.mf6.ModflowGwfghb(gwf, stress_period_data=ghbdata, save_flows=True)
 
+    initial_preconsolidation_head = False
+    if not head_based:
+        initial_preconsolidation_head = True
+        specified_initial_interbed_state = True
+
     # Create the subsidence package
     csub = flopy.mf6.ModflowGwfcsub(gwf, print_input=True,save_flows=True,
-                                    head_based=True,
-                                    initial_preconsolidation_head=False,
+                                    head_based=head_based,
+                                    initial_preconsolidation_head=initial_preconsolidation_head,
                                     update_material_properties=update_material_properties,
                                     specified_initial_interbed_state=specified_initial_interbed_state,
                                     ndelaycells=ndelaycells,
@@ -282,9 +319,10 @@ def initialize_model(location,freq="Y",start_datetime=None,wl_sample="mean",
                                     cg_ske_cr=prop_df.loc["cg_ske_cr",:].values,
                                     packagedata=sub6,
                                     zdisplacement_filerecord=f"{modelname}.displacement.hds",
-                                    package_convergence_filerecord=f"{modelname}.conv.log",)
+                                    package_convergence_filerecord=f"{modelname}.conv.log",
+                                    strainib_filerecord=f"{modelname}.strainib.csv")
     
-    
+    # Create obs package of simulated heads for every layer
     opth = f"{modelname}.gwf.obs"
     cpth = opth + ".csv"
     obs_array = []
@@ -297,8 +335,8 @@ def initialize_model(location,freq="Y",start_datetime=None,wl_sample="mean",
             ]
         )
     flopy.mf6.ModflowUtlobs(gwf,digits=10,print_input=True,filename=opth,continuous={cpth: obs_array})
+
     # Create obs package for every layer of total cell compaction
-    
     opth = f"{modelname}.csub.obs"
     csub_csv = opth + ".csv"
     obslist = []
@@ -308,22 +346,44 @@ def initialize_model(location,freq="Y",start_datetime=None,wl_sample="mean",
             obslist.append(
                             (tag,f"{obsvalue}-cell",(k, 0, 0))
                         )
-    for obsvalue in ['delay-preconstress','delay-head']:
-        for k in range(1,nlay):
-            tag = f"{obsvalue}.{k + 1:02d}"
+
+    for obsvalue in ("interbed-compaction-pct",):
+        for ib in sub6:
+            kk = ib[0]
+            k = ib[1][0]
+            tag = f"{obsvalue}.{k + 1:02d}.{kk + 1:02d}"
             obslist.append(
-                                (tag+".{0}".format(int(ndelaycells)-1),
-                                    f"{obsvalue}",(k, 0, int(ndelaycells)-1))
-                            )
-            # for i in range(ndelaycells):
-            #     obslist.append(
-            #                     (tag+".{0}".format(i+1),f"{obsvalue}",(k, 0, i))
-            #                 )
+                (tag, obsvalue, (kk,))
+            )
+
+    kkpos = int(ndelaycells / 2) + 1
+    for obsvalue in ['delay-preconstress','delay-head']:
+        for ib in sub6:
+            if ib[2] == "delay":
+                kk = ib[0]
+                k = ib[1][0]
+                #for kkpos in range(int(ndelaycells)):
+                for kkpos in [0,int(ndelaycells/2),int(ndelaycells)-1]:
+                    tag = f"{obsvalue}.{k + 1:02d}.{kk + 1:02d}"
+                    obslist.append(
+                        (
+                            f"{tag}.{kkpos:02d}",
+                            f"{obsvalue}",(kk, kkpos)
+                        )
+                    )
+                # tag = f"{obsvalue}.{k + 1:02d}.{kk + 1:02d}"
+                # obslist.append(
+                #     (
+                #         f"{tag}.{kkpos}",
+                #         f"{obsvalue}",(k, 0, kkpos)
+                #     )
+                # )
     orecarray = {csub_csv: obslist}
     csub.obs.initialize(
         filename=opth, digits=10, print_input=True, continuous=orecarray
     )
-    
+
+    # Create output control package
     oc = flopy.mf6.ModflowGwfoc(gwf, printrecord=[("BUDGET", "ALL")], budget_filerecord=f"{modelname}.cbc",
                                 saverecord=[("HEAD", "ALL"),("BUDGET", "ALL")], head_filerecord=f"{modelname}.hds",
                                 budgetcsv_filerecord="budget.csv")
@@ -359,7 +419,8 @@ def clean_model(location):
 
 def build_model(location,use_delay,prepfunc_kwargs={},prerun=True,
                 freq='Y',start_datetime=None,wl_sample="mean",
-                specified_initial_interbed_state=True):
+                specified_initial_interbed_state=True,
+                head_based=False):
     
     sys.path.insert(0,location)
     import prep_data
@@ -374,15 +435,16 @@ def build_model(location,use_delay,prepfunc_kwargs={},prerun=True,
     # if rolling_window is not None:
     #     prep_data.prep_data(use_delay,rolling_window)
     # else:
-    prep_data.prep_data(use_delay,**prepfunc_kwargs)
+    prep_data.prep_data(use_delay, **prepfunc_kwargs)
     os.chdir(b_d)
     
 
     sim,model_ws = initialize_model(location,freq=freq,start_datetime=start_datetime,
                                     wl_sample=wl_sample,
-                                    specified_initial_interbed_state=specified_initial_interbed_state)
+                                    specified_initial_interbed_state=specified_initial_interbed_state,
+                                    head_based=head_based)
     clean_model(location)
-    
+
     if prerun:
         pyemu.os_utils.run("mf6",cwd=model_ws)
         
@@ -489,8 +551,12 @@ def plot_results_scenario(location,scenario):
 
 
 if __name__ == "__main__":
+    site="D454"
+
     #d = os.path.join("C:\Projects","1D_CSUB")
-    build_model('376.676',use_delay=True,prerun=True)
+    station = "H201" # "T949R"
+    build_model(station, use_delay=True, prerun=True, 
+                specified_initial_interbed_state=False) #[0.333])
     #initialize_model("OCTOL","MS")
     #build_model('J88',freq='1Y',scenario="baseline",prerun=True)
     #run_all(locations=['J88'], freq='1Y')

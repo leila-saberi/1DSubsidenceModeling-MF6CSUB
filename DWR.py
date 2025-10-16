@@ -11,15 +11,14 @@ date_string = today.strftime("%m%d%Y")
 def main(
         sites=None,
         num_reals= 500,
-        annual_num_workers= 48,
-        annual_noptmax= 30,
-        monthly_num_workers= 48,
-        monthly_noptmax=6, 
-        use_focus_weights=False,
+        monthly_num_workers= 120,
+        monthly_noptmax=35,
+        use_focus_weights=True,
         use_obs_diff=True,
         use_delay=True,
         plot=True,
         port=None,
+        scenario_subset = 100
 ):
     """
     This function runs the workflow with history matching and scenarios.
@@ -57,7 +56,7 @@ def main(
     """
   
     if sites is None:
-        sites = ["T88", "212.8"]
+        sites = ["B88"] #Add the name of any site you want to run
     else:
         if isinstance(sites, str):
             sites = [sites]
@@ -66,37 +65,33 @@ def main(
         port = random.randint(4000, 9000)
 
     for site_name in sites:
-        exp_tag = f"_{date_string}"
-        prefer_less_rebound = 1e-20
-        if site_name in [""]: #If you need less rebound for a specific site include it here
-            prefer_less_rebound = 0.4
-            rb_tag = str(prefer_less_rebound).split(".")[1]
-            exp_tag = f"_{date_string}_{rb_tag}"
+        prefer_less_rebound = [0.1, 0.1] #To constrain rebound, set this to numbers between 0.1 to 0.5
+        ibtie = ["all", True]  #Allows you to run the model with properties tied across all layers or by layer
+        quantiles = [[0.1, 0.25, 0.33, 0.66, 0.75, 0.9], [0.1, 0.25, 0.33, 0.66, 0.75, 0.9]]
+        exp_tags = [f"_{date_string}", f"_{date_string}"]
 
-        if site_name in ['GWM_14', 'T88']:
-            num_reals = 250
-            annual_noptmax = 30
-            monthly_noptmax = 25
+        scenariofiles = ["CH_forecast", "DWR_scenarios", "2015_scenario"] #This allows you to run the scenarios
 
-        m_d = workflow.analyze_site(site_name, num_reals=num_reals, noptmax=annual_noptmax,
-                                    num_workers=annual_num_workers, run=True, use_obs_diff=use_obs_diff,
-                                    prep=True, plot=plot, use_delay=use_delay, use_focus_weights=use_focus_weights,
-                                    experiment_tag=exp_tag,
-                                    port=port, freq="Y", include_ghb_pars=True,
-                                    estimate_clay_thickness=True, specified_initial_interbed_state=False,
-                                    prefer_less_rebound=prefer_less_rebound)
+        for pref, ib, quants, exp_tag in zip(prefer_less_rebound, ibtie, quantiles, exp_tags):
+            workflow.analyze_site(site_name, num_reals=num_reals, noptmax=monthly_noptmax, usecondor=True,
+                                  num_workers=monthly_num_workers, run=True, use_obs_diff=use_obs_diff,
+                                  prep=True, plot=plot, use_delay=use_delay, use_focus_weights=use_focus_weights,
+                                  experiment_tag=exp_tag,
+                                  port=port, freq="M", include_ghb_pars=True,
+                                  estimate_clay_thickness=False, run_scenarios=False, plot_scens=False,
+                                  scenario_tag="",
+                                  run_prior_scenarios=False, export_scenario_basereals=False,
+                                  scenario_subset=scenario_subset,
+                                  morris_scenario_name=None, specified_initial_interbed_state=True,
+                                  assimilate_all=True, prefer_less_rebound=pref,
+                                  prefer_less_delayedfuture=False, scenariofiles=scenariofiles, head_based=False,
+                                  prepfunc_kwargs={"quantiles": quants},
+                                  tie_ib_by_layer=ib, run_mod_fxn=False)
 
-        workflow.analyze_site(site_name, num_reals=num_reals, noptmax=monthly_noptmax,
-                              num_workers=monthly_num_workers, run=True, use_obs_diff=use_obs_diff,
-                              prep=True, plot=plot, use_delay=use_delay, use_focus_weights=use_focus_weights,
-                              experiment_tag=exp_tag,
-                              port=port, freq="M", include_ghb_pars=True,
-                              estimate_clay_thickness=True, specified_initial_interbed_state=False,
-                              xfer_from_m_d=m_d, prefer_less_rebound=prefer_less_rebound)
-
-    workflow.gather_pdfs(sites, combine_to_one=False)
-    workflow.gather_csvs(sites, combine_to_one=False)
-    workflow.gather_pngs(sites, combine_to_one=False)
+    workflow.gather_pdfs(fig_sites, combine_to_one=False)
+    workflow.gather_csvs(fig_sites, combine_to_one=False)
+    workflow.gather_pngs(fig_sites, combine_to_one=False)
+    workflow.gather_results(fig_sites)
 
 if __name__ == "__main__":
 

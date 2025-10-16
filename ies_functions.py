@@ -18,7 +18,7 @@ from scipy import stats
 import pyemu
 import flopy
 import platform
-import model_functions
+# import model_functions
 import glob
 import re
 
@@ -135,25 +135,24 @@ def prep_for_parallel(b_d, ct_d, noptmax=-1,
     else:    
         pst.pestpp_options["ies_multimodal_alpha"] = 0.99
         pst.pestpp_options["ies_num_threads"] = 4
-    if noptmax >= 10:
-        pst.pestpp_options["ies_n_iter_mean"] = [-1,-2,9999]
-    if noptmax >= 20:
-        pst.pestpp_options["ies_n_iter_mean"] = [-1,-3,-3,9999] #testLessNoise
-    if noptmax >= 30:
-        pst.pestpp_options["ies_n_iter_mean"] = [-1,-3,-5,-5,9999] #testLessNoise
-    if noptmax >= 40:
-        pst.pestpp_options["ies_n_iter_mean"] = [-1,-3,-5,-5,-5,9999] #testLessNoise
+    # if noptmax >= 10:
+    #     pst.pestpp_options["ies_n_iter_mean"] = [-1,9999]
+    # if noptmax >= 20:
+    #     pst.pestpp_options["ies_n_iter_mean"] = [-1,-3,9999] #testLessNoise
+    # if noptmax >= 30:
+    #     pst.pestpp_options["ies_n_iter_mean"] = [-3,-5,-5,9999] #testLessNoise
+    # if noptmax >= 40:
+    #     pst.pestpp_options["ies_n_iter_mean"] = [-1,-3,-5,-5,9999] #testLessNoise
         
 
     pst.control_data.nphinored = 10000
     pst.control_data.nphistp = 10000
-    #pst.pestpp_options["panther_agent_freeze_on_fail"] = True
-
+    
     # draw options
     pst.pestpp_options["ies_no_noise"] = False
     pst.pestpp_options["ies_group_draws"] = False
 
-    #pst.pestpp_options["ies_initial_lambda"] = -10 # 10 * initial phi
+    pst.pestpp_options["ies_initial_lambda"] = -10 # 10 * initial phi
     pst.pestpp_options["ies_subset_size"] = -15 # 10% of ensemble size used for evaluating Marquardt Lambdas
 
     #pst.pestpp_options["panther_agent_freeze_on_fail"] = True
@@ -190,7 +189,7 @@ def run_local(worker_dir, master_dir, pst_name="pest.pst", num_workers=10, port=
 
 
 
-def prep_deps(d):
+def prep_deps(d, deps=["flopy","pyemu"], include_pastas=False):
     """copy exes to a directory based on platform
     Args:
         d (str): directory to copy into
@@ -209,56 +208,93 @@ def prep_deps(d):
         bd = os.path.join("bin", "mac")
         
     for f in os.listdir(bd):
-            shutil.copy2(os.path.join(bd, f), os.path.join(d, f))
+        shutil.copy2(os.path.join(bd, f), os.path.join(d, f))
 
-    try:
-        shutil.rmtree(os.path.join(d,"flopy"))
-    except:
-        pass
+    if include_pastas:
+        deps += ["pastas"]
 
-    shutil.copytree(os.path.join('dependencies', 'flopy'), os.path.join(d,"flopy"))
+    for dep in deps:
+        try:
+            shutil.rmtree(os.path.join(d,dep))
+        except:
+            pass
 
-    try:
-        shutil.rmtree(os.path.join(d,"pyemu"))
-    except:
-        pass
+        shutil.copytree(os.path.join('dependencies',dep), os.path.join(d,dep))
 
-    shutil.copytree(os.path.join('dependencies',"pyemu"), os.path.join(d,"pyemu"))
+    # try:
+    #     shutil.rmtree(os.path.join(d,"pyemu"))
+    # except:
+    #     pass
+    #
+    # shutil.copytree(os.path.join('dependencies',"pyemu"), os.path.join(d,"pyemu"))
+    #
+    # if include_pastas:
+    #     try:
+    #         shutil.rmtree(os.path.join(d,"pastas"))
+    #     except:
+    #         pass
+    #
+    #     shutil.copytree(os.path.join('dependencies',"pastas"), os.path.join(d,"pastas"))
 
 
-def csub_pars_to_pkgdata(template_ws="."):
-    df = pd.read_csv(os.path.join(template_ws,"csub_input.csv"),index_col=0)
-    names = ["lay", "row", "col", "cdelay", "pcs0", "thick_frac", "rnb", "ssv_cc",
-             "sse_cr", "theta", "kv", "h0"]
-    df.index += 1 #to be icsubno
-    if "clay_lith" in df.columns and "clay_thickness_squared" in df.columns and "clay_thickness" in df.columns:
-        bequiv = np.sqrt(df["clay_thickness_squared"].values/df["clay_lith"].values)
-        df["org_rnb"] = df.rnb.copy()
-        df["org_thick_frac"] = df.thick_frac.copy()
-        df["rnb"] = df['clay_thickness'] / bequiv
-        rnb = df.rnb.values
-        rnb[rnb<1.0] = 1.0
-        df["rnb"] = rnb
-        df["thick_frac"] = bequiv
-        df["gwf-clay-thickness"] = df.thick_frac * df.rnb
-        df["gwf-to-csub-ratio"] = df["gwf-clay-thickness"] / df["gwf_thickness"]
-        df.loc[df["gwf-to-csub-ratio"]>1.0,"thick_frac"] = 0.99 * (df["thick_frac"] / df.loc[df["gwf-to-csub-ratio"]>1.0,"gwf-to-csub-ratio"])
-        df["implied-clay-layer_thickness"] = df['clay_thickness'].values / df["clay_lith"].values
-        df["implied-clay2-layer_thickness"] = np.sqrt(df['clay_thickness_squared'].values) / df["clay_lith"].values
-        df["implied-thick-diff"] = df["implied-clay-layer_thickness"].values - df["implied-clay2-layer_thickness"]
-        df["sse2ssv-ratio"] = df["sse_cr"] / df["ssv_cc"]
-        print(bequiv)
-        print(df["rnb"])
-        print(df["thick_frac"])
+# def csub_pars_to_pkgdata(template_ws="."):
+#     org_df = pd.read_csv(os.path.join(template_ws,"csub_input.csv"),index_col=0).T
+#     matching_rows = org_df[org_df.index.str.contains("thick_frac_")]
+#     unique_matching_rows = matching_rows.index.unique()
+#     print(matching_rows)
+#     unique_ibsuffix = list(set([int(r.split("_")[-1]) for r in matching_rows.index]))
+#     unique_ibsuffix.sort()
+#     print(unique_ibsuffix)
+#     print(unique_matching_rows)
+    
+#     names = [
+#         "lay", "row", "col", "cdelay", 
+#         "pcs0", 
+#         "thick_frac", "rnb", "ssv_cc",
+#         "sse_cr", "theta", "kv", "h0"
+#         ]
+#     ib_varnames = ["clay_thickness","thick_frac","rnb","clay_lith","clay_thickness_squared"]
+
+#     ibno = 1
+#     dfs = []
+#     for suffix in unique_ibsuffix:
+#         nnames = names.copy()
+#         for i,n in enumerate(ib_varnames):
+#             nnames[nnames.index(n)] = "{0}_{1}".format(n,suffix)
+
+#         df = org_df.loc[nnames]
+#     exit()
         
-        df.loc[df.cdelay.str.lower()=="nodelay","rnb"] = df.loc[df.cdelay.str.lower()=="nodelay","org_rnb"]
-        df.loc[df.cdelay.str.lower()=="nodelay","thick_frac"] = df.loc[df.cdelay.str.lower()=="nodelay","org_thick_frac"]
+
+
+#     if "clay_lith" in df.columns and "clay_thickness_squared" in df.columns and "clay_thickness" in df.columns:
+#         bequiv = np.sqrt(df["clay_thickness_squared"].values/df["clay_lith"].values)
+#         df["org_rnb"] = df.rnb.copy()
+#         df["org_thick_frac"] = df.thick_frac.copy()
+#         df["rnb"] = df['clay_thickness'] / bequiv
+#         rnb = df.rnb.values
+#         rnb[rnb<1.0] = 1.0
+#         df["rnb"] = rnb
+#         df["thick_frac"] = bequiv
+#         df["gwf-clay-thickness"] = df.thick_frac * df.rnb
+#         df["gwf-to-csub-ratio"] = df["gwf-clay-thickness"] / df["gwf_thickness"]
+#         df.loc[df["gwf-to-csub-ratio"]>1.0,"thick_frac"] = 0.99 * (df["thick_frac"] / df.loc[df["gwf-to-csub-ratio"]>1.0,"gwf-to-csub-ratio"])
+#         df["implied-clay-layer_thickness"] = df['clay_thickness'].values / df["clay_lith"].values
+#         df["implied-clay2-layer_thickness"] = np.sqrt(df['clay_thickness_squared'].values) / df["clay_lith"].values
+#         df["implied-thick-diff"] = df["implied-clay-layer_thickness"].values - df["implied-clay2-layer_thickness"]
+#         df["sse2ssv-ratio"] = df["sse_cr"] / df["ssv_cc"]
+#         print(bequiv)
+#         print(df["rnb"])
+#         print(df["thick_frac"])
         
-    df.loc[:,names].to_csv(os.path.join(template_ws,"model.csub_packagedata.txt"),header=False,sep=" ")
-    df.drop(["cdelay","row","col"],axis=1,inplace=True)
-    df.index = df.pop("lay") - 1
-    df.index.name = "k"
-    df.to_csv(os.path.join(template_ws,"listinput_obs.csv"))
+#         df.loc[df.cdelay.str.lower()=="nodelay","rnb"] = df.loc[df.cdelay.str.lower()=="nodelay","org_rnb"]
+#         df.loc[df.cdelay.str.lower()=="nodelay","thick_frac"] = df.loc[df.cdelay.str.lower()=="nodelay","org_thick_frac"]
+        
+#     df.loc[:,names].to_csv(os.path.join(template_ws,"model.csub_packagedata.txt"),header=False,sep=" ")
+#     df.drop(["cdelay","row","col"],axis=1,inplace=True)
+#     df.index = df.pop("lay") - 1
+#     df.index.name = "k"
+#     df.to_csv(os.path.join(template_ws,"listinput_obs.csv"))
 
 def replace_time_with_datetime(csv_file, add_subsidence=True, start_datetime='1904-12-31',
                                nlay=3): 
@@ -320,7 +356,9 @@ def initialize_input_obs(template_ws="template", mod_name="model"):
 
 
 def setup_pst(org_d, site_name, template_ws=None, num_reals=100,include_ghb_pars=False,
-    estimate_clay_thickness=False):
+              estimate_clay_thickness=False,include_pastas=False, pcs0_range=300,
+              tie_ib_by_layer=True):
+
     
     mod_name = "model"#f'{site_name}.{version}'
     assert os.path.exists(org_d)
@@ -346,13 +384,13 @@ def setup_pst(org_d, site_name, template_ws=None, num_reals=100,include_ghb_pars
     #print(botm_dict)
     
     # Model properties
-    start_datetime = sim.tdis.start_date_time.data
+    start_datetime = sim.tdis.start_date_time.data # todo check that start_datetime = pastas start_datetime
     perlen = sim.tdis.perioddata.array["perlen"]
     use_monthly_ghbs = True
-    corrlen = 365*1
-    if perlen.mean() > 30:
+    corrlen = 365*8 # correlation length for the temporal variogram (temporal_v) -> x years
+    if perlen.mean() > 30: # if perlen > x days on average
         use_monthly_ghbs = False
-        corrlen = 365*1
+        corrlen = 365*8 # -> 5 years
     nlay = gwf.dis.nlay.data
     botm = gwf.dis.botm.array
     thickness = {0:gwf.dis.top.array[0,0] - botm_dict[0]}
@@ -372,7 +410,7 @@ def setup_pst(org_d, site_name, template_ws=None, num_reals=100,include_ghb_pars
     pf.tmp_files.append(f"{mod_name}.hds")
     pf.tmp_files.append(f"{mod_name}.lst")
     
-    prep_deps(template_ws)
+    prep_deps(template_ws, include_pastas=include_pastas)
 
     cum,inc = get_lst_budget(template_ws,start_datetime=start_datetime)
     pf.add_py_function("ies_functions.py","get_lst_budget('.',start_datetime='{0}')".format(pd.to_datetime(start_datetime).strftime("%Y%m%d")),is_pre_cmd=False)
@@ -380,6 +418,51 @@ def setup_pst(org_d, site_name, template_ws=None, num_reals=100,include_ghb_pars
     pf.add_observations("inc.csv",index_cols=[inc.index.name],use_cols=inc.columns.tolist(),prefix="lstinc",obsgp="lstinc",ofile_sep=",")
     pf.add_observations("nfail.csv",index_cols=["onme"],use_cols=["oval"],prefix="nfail",obsgp="nfail",ofile_sep=",")
 
+    # if include_pastas:
+    #
+    #     pf.extra_py_imports.append("pastas as ps")
+    #
+    #     pf.mod_py_cmds.append("run_pastas_model()")
+    #     pf.add_py_function("model_functions.py", "pastas_run_model()", is_pre_cmd=True)
+    #     # pf.add_py_function("model_functions.py", "get_pastas_model(input_df,output_df,output_col)", is_pre_cmd=None) #todo
+    #
+    #     # map_h_pastas_to_mf6(freq="Y")
+    #     pf.add_py_function("model_functions.py", "pastas_map_h_to_mf6()", is_pre_cmd=True)
+    #
+    #     # -------- add observations
+    #
+    #     # add pastas gw level obs (=! mf6 gw level obs)
+    #     pastas_out = "pastas_simgw.csv"#f'{mod_name}.gwf.obs.csv'
+    #     # pf.post_py_cmds.append(
+    #     #     f'replace_time_with_datetime("{gwf_out}", start_datetime="{start_datetime}", add_subsidence=False)')
+    #
+    #     # df = replace_time_with_datetime(os.path.join(template_ws, pastas_out),
+    #     #                                 start_datetime=start_datetime, add_subsidence=False)
+    #     ps_df = pf.add_observations("datetime_" + pastas_out,
+    #                                  index_cols=["datetime"], use_cols=pastas_out.columns.tolist(),
+    #                                  prefix="pastas", ofile_sep=",")
+    #
+    #     # -------- add parameters
+    #
+    #     # any additional mods to the pastas pars here...
+    #     pastas_pars = pd.read_csv(os.path.join(pf.new_d, "pastas_pars.csv"), index_col=0)
+    #     if "trend-a" in pastas_pars.index:
+    #         pastas_pars.loc["trend-a", "pmin"] = -0.1
+    #         pastas_pars.loc["trend-a", "pmax"] = 0.1
+    #         pastas_pars.loc["trend-a", "initial"] = min(pastas_pars.loc["trend-a", "initial"], 0.00)
+    #         pastas_pars.loc["trend-a", "initial"] = max(pastas_pars.loc["trend-a", "initial"], -0.1)
+    #
+    #     # cd_val = pastas_pars.loc["constant-d", "initial"]
+    #     pastas_pars.loc["constant-d", "pmin"] = min(-100, pastas_pars.loc["constant-d", "initial"])
+    #     pastas_pars.loc["constant-d", "pmax"] = max(100, pastas_pars.loc["constant-d", "initial"])
+    #
+    #     pastas_pars.to_csv(os.path.join(pf.new_d, "pastas_pars.csv"))
+    #
+    #     model_functions.test_pastas_run_model(template_ws)
+    #
+    #     pastas_pars_df = pf.add_parameters("pastas_pars.csv", par_type="grid", par_style="direct",
+    #                                        index_cols=["pastaname"], use_cols=["initial"],
+    #                                        pargp="pastas", par_name_base="pastas", mfile_sep=",", transform="none")
 
     # produce arrays from csub packagedata
     #raw_csub_df = csub_arrs_from_pkgdata(template_ws, mod_name)
@@ -390,17 +473,21 @@ def setup_pst(org_d, site_name, template_ws=None, num_reals=100,include_ghb_pars
                                          bearing=0.0, name="temporal_v")
     temporal_gs = pyemu.geostats.GeoStruct(variograms=temporal_v, transform='none',
                                            name="temporal_gs") 
-    
+
     df = test_csv_to_ghb(template_ws)
     pf.add_py_function("ies_functions.py", "csv_to_ghb()", is_pre_cmd=True)
-    pf.add_parameters("input_ghb.csv", index_cols=["datetime", "kper", "k"], use_cols="bhead", par_type="constant",
-                          par_style="a", transform="none", initial_value=0, lower_bound=-40, pargp="consthead",
-                          par_name_base="consthead",
-                          upper_bound=40, mfile_sep=",")
+    # ghb heads: one constant additive par for all stress periods/layers
+    # pf.add_parameters("input_ghb.csv", index_cols=["datetime", "kper", "k"], use_cols="bhead", par_type="constant",
+    #                       par_style="a", transform="none", initial_value=0, lower_bound=-10, pargp="consthead",
+    #                       par_name_base="consthead",
+    #                       upper_bound=10, mfile_sep=",")
+    
     if include_ghb_pars:
-        upper_bound = 50
-        lower_bound = -50
+        upper_bound = 5
+        lower_bound = -5
         df = test_csv_to_ghb(template_ws)
+        
+       
         pf.add_parameters("input_ghb.csv", index_cols=["datetime", "kper", "k"], use_cols="bhead", par_type="grid",
                           par_style="a", transform="none", initial_value=0, lower_bound=lower_bound, pargp="ghbhead",
                           par_name_base="ghbhead",upper_bound=upper_bound, mfile_sep=",")
@@ -419,37 +506,40 @@ def setup_pst(org_d, site_name, template_ws=None, num_reals=100,include_ghb_pars
         
     pf.add_py_function("ies_functions.py","enforce_ghb_botm(nlay={0})".format(nlay),is_pre_cmd=True)
 
+    # ghb heads: one direct grid par/stress period/layer
     # these are just for scenarios...they get fixed later
     pf.add_parameters("input_ghb.csv", index_cols=["datetime", "kper", "k"], use_cols="bhead", par_type="grid",
                       par_style="d", transform="none", pargp="directghbhead",
                       par_name_base="directghbhead",
                       mfile_sep=",")
 
-    org_pkg_df = pd.read_csv(os.path.join(site_name,"processed_data","{0}.model_property_data.csv".format(site_name)),index_col=0)
-    keep_names = ["cdelay", "pcs0", "thick_frac", "rnb", "ssv_cc",
-             "sse_cr", "theta", "kv", "h0","clay_thickness_squared","clay_lith","clay_thickness"]
-    par_names = ["pcs0", "thick_frac", "rnb", "ssv_cc",
-             "sse_cr", "theta", "kv", "h0","clay_thickness_squared","clay_lith","clay_thickness"]
-    if not estimate_clay_thickness:
-        par_names = par_names[:-3]
-        keep_names = keep_names[:-3]
+# <<<<<<< HEAD
+#     # add csub parameters
+#     org_pkg_df = pd.read_csv(os.path.join(site_name,"processed_data","{0}.model_property_data.csv".format(site_name)),index_col=0)
+#     keep_names = ["cdelay", "pcs0", "thick_frac", "rnb", "ssv_cc",
+#              "sse_cr", "theta", "kv", "h0","clay_thickness_squared","clay_lith","clay_thickness"]
+#     par_names = ["pcs0", "thick_frac", "rnb", "ssv_cc",
+#              "sse_cr", "theta", "kv", "h0","clay_thickness_squared","clay_lith","clay_thickness"]
+#     if not estimate_clay_thickness:
+#        par_names = par_names[:-3]
+#        keep_names = keep_names[:-3]
 
-    pkg_df = org_pkg_df.loc[keep_names,:].T
+#     pkg_df = org_pkg_df.loc[keep_names,:].T
 
-    pkg_df.index = [int(i) for i in pkg_df.index]
-    pkg_df.index.name = "k"
+#     pkg_df.index = [int(i) for i in pkg_df.index]
+#     pkg_df.index.name = "k"
+# =======
+# >>>>>>> feat_strainobs
     
-    print(pkg_df.index)
-    pkg_df["lay"] = pkg_df.index + 1
-    pkg_df["row"] = 1
-    pkg_df["col"] = 1
-
-    pkg_df["gwf_thickness"] = pkg_df.lay.apply(lambda x: thickness[x-1])
+    csubdf = test_csv_to_csub(template_ws)
+    pf.add_py_function("ies_functions.py","csv_to_csub()",is_pre_cmd=True)
+    use_cols = list(csubdf.columns.values[5:-1])
+    pf.add_parameters("model.csub_packagedata.txt.csv",index_cols=["icsubno","layer","row","column"],
+                      use_cols=use_cols,pargp=["csub" for _ in use_cols],
+                      par_name_base=["csub" for _ in use_cols],
+                      par_type="grid",par_style="direct")
     
-    pkg_df.to_csv(os.path.join(pf.new_d,"csub_input.csv"))
-    pf.add_parameters("csub_input.csv",index_cols=['k'],par_type="grid",par_style="d",
-                      use_cols=par_names,pargp=["csub" for _ in par_names],
-                      par_name_base=["csub" for _ in par_names])
+
 
     pnames = ['cg_ske_cr', 'cg_theta']
     
@@ -467,7 +557,7 @@ def setup_pst(org_d, site_name, template_ws=None, num_reals=100,include_ghb_pars
                 pf.add_parameters(f, par_type='constant', upper_bound=20, lower_bound=0.05,
                                   par_name_base=f'{pname}_lyr{k+1}', pargp=pname)
                                   ##ult_ubound=par_data.uubnd[idx]*1.2, ult_lbound=par_data.ulbnd[idx]/1.2,
-                
+
     # # Parameterization of k33 on an aquifer basis 
     k33_files = os.listdir(template_ws)
     k33_files = [f for f in k33_files if f.startswith("model.npf_k33") and f.endswith(".txt")]
@@ -481,29 +571,21 @@ def setup_pst(org_d, site_name, template_ws=None, num_reals=100,include_ghb_pars
                           ult_ubound=val*100,ult_lbound=val*0.01,pargp="k33_k:{0}".format(k),
                           par_name_base="k33_k:{0}".format(k))
     
-
-    # load csub array data into package data list
-    #initialize_csub_arrs_to_pkgdata(template_ws, mod_name,nlay)
-    # add processing scripts to pst forward run
-    #pf.add_py_function("ies_functions.py", "csub_arrs_to_pkgdata(nlay={0})".format(nlay), is_pre_cmd=True)
-    csub_pars_to_pkgdata(template_ws)
-    pf.add_py_function("ies_functions.py","csub_pars_to_pkgdata()",is_pre_cmd=True)
+    
     pf.add_py_function("ies_functions.py", "get_input_obs()", is_pre_cmd=False)
-    # add call to PRE processing script to pst forward run
-    #pf.pre_py_cmds.append(f'csub_arrs_to_pkgdata("{mod_name}", nlay={nlay})')
-    # add model run command
     pf.mod_sys_cmds.append("mf6")
     # import necessary libraries in forward_run.py
     # pf.extra_py_imports.append('flopy') 
     # add call to processing script to pst forward run
     #pf.post_py_cmds.append(f"get_input_obs('{mod_name}')")
-   
-    # Subsidence observations
+
     csub_out = f'{mod_name}.csub.obs.csv'
+    
     # add processing script to pst forward run
     pf.add_py_function("ies_functions.py", "replace_time_with_datetime()",
                         is_pre_cmd=None)
-    
+
+    # head observations
     gwf_out = f'{mod_name}.gwf.obs.csv'
     pf.post_py_cmds.append(f'replace_time_with_datetime("{gwf_out}", start_datetime="{start_datetime}", add_subsidence=False)')
 
@@ -513,7 +595,8 @@ def setup_pst(org_d, site_name, template_ws=None, num_reals=100,include_ghb_pars
                                   index_cols=["datetime"], use_cols=df.columns.tolist(),
                                   prefix="hds", ofile_sep=",")
 
-
+    # Subsidence observations
+    csub_out = f'{mod_name}.csub.obs.csv'
     # add call to processing script to pst forward run
     pf.post_py_cmds.append(f'replace_time_with_datetime("{csub_out}", start_datetime="{start_datetime}", add_subsidence=True, nlay={nlay})')
 
@@ -522,12 +605,7 @@ def setup_pst(org_d, site_name, template_ws=None, num_reals=100,include_ghb_pars
     csub_df = pf.add_observations("datetime_" + csub_out,
                                   index_cols=["datetime"], use_cols=df.columns.tolist(),
                                   prefix="sub", ofile_sep=",")
-    # csub_df.loc[:,'year'] = csub_df.loc[:,'obsnme'].apply(lambda x: x.split(':')[-1][0:4])
-    # csub_df.loc[:, "weight"] = 0.
-    # csub_df.loc[:, "datetime"] = csub_df.loc[:,"obsnme"].apply(lambda x: x[-8:])
-    # csub_df.loc[:, 'source'] = 'mf6'
-    # csub_df = csub_df.loc[:, ['obsnme', 'obsval', 'obgnme', 'weight', 'datetime', 'source']]
-    
+   
     
     # track csub inputs
     pf.parfile_relations.to_csv(os.path.join(pf.new_d, "mult2model_info.csv"))
@@ -536,20 +614,20 @@ def setup_pst(org_d, site_name, template_ws=None, num_reals=100,include_ghb_pars
                                    index_cols=['pname'], use_cols=["lower_bound","upper_bound",'pval'],
                                    prefix='arrobs', obsgp="arrobs",ofile_sep=",")
     
-    pf.tmp_files.append("listinput_obs.csv")
-    df = pd.read_csv(os.path.join(template_ws,"listinput_obs.csv"),index_col=0)
-    pf.add_observations("listinput_obs.csv",index_cols=["k"],
-                        use_cols=df.columns.tolist(),
+    pf.tmp_files.append("model.csub_packagedata.txt.csv")
+    df = pd.read_csv(os.path.join(template_ws,"model.csub_packagedata.txt.csv"))
+    pf.add_observations("model.csub_packagedata.txt.csv",index_cols=["icsubno","layer"],
+                        use_cols=df.columns.tolist()[5:],
                         prefix="listobs",obsgp="listobs")
 
 
-
+    # final ghb head that was applied for the run (after enforce_ghb_botm possibly modified the ghb heads in input_ghb.csv)
     #if include_ghb_pars:
     df = test_ghbhead_to_csv(template_ws)
     pf.add_py_function("ies_functions.py","ghbhead_to_csv()",is_pre_cmd=False)
     ghbdf = pf.add_observations("ghb.csv",index_cols=["k","datetime"],use_cols=["bhead"],prefix="ghbhead",obsgp="ghbhead",ofile_sep=",")
-        
-    
+
+    # subsidence difference observations
     pf.add_py_function("ies_functions.py","process_diff_obs()",is_pre_cmd=False)
     df = setup_diff_obs(template_ws)
     pf.add_observations("diff_datetime_model.csub.obs.csv",index_cols=["dt1","dt2"],use_cols=["diff"],
@@ -572,65 +650,185 @@ def setup_pst(org_d, site_name, template_ws=None, num_reals=100,include_ghb_pars
     pf.add_observations("percent_compaction.csv",index_cols=["datetime"],use_cols=df.columns.tolist(),
                         prefix="percent-compact",obsgp=df.columns.tolist(),ofile_sep=",")
     
+
     
     pf.add_py_function("ies_functions.py","process_compaction_at_above_obs()",is_pre_cmd=False)
     df = process_compaction_at_above_obs(template_ws)
     pf.add_observations("compaction_atabove.csv",index_cols=["datetime"],use_cols=df.columns.tolist(),
                         prefix="atabove-compact",obsgp=df.columns.tolist(),ofile_sep=",")
 
-    # BUILD PEST  
+
+    pf.add_py_function("ies_functions.py","process_strain()",is_pre_cmd=False)
+    df = process_strain(template_ws)
+    
+    pf.add_observations("model.strainib.csv",index_cols=["interbed-number"],use_cols=["total-strain","percent-compaction"],
+                       prefix="ibstrain",obsgp="ibstrain",ofile_sep=",",ofile_skip=0)
+    
+    
+    # pf.add_py_function("ies_functions.py","extract_strain_from_list()",is_pre_cmd=False)
+    # df = extract_strain_from_list(template_ws)
+    # pf.add_observations("strain_obs.csv",index_cols=["ibnum"],use_cols=df.columns.tolist(),
+    #                     prefix="ibstrain",obsgp=df.columns.tolist(),ofile_sep=",")
+
+    pf.add_py_function("ies_functions.py","repair_thickfrac()",is_pre_cmd=True)
+
+    # BUILD PEST   
     pst = pf.build_pst('pest.pst', version=2)
     
     par = pst.parameter_data
+
+    # -------- csub parameters
+
     #keep_names = ["cdelay", "pcs0", "thick_frac", "rnb", "ssv_cc",
     #         "sse_cr", "theta", "kv", "h0","clay_thickness","clay_lith"]
 
-    ppar = par.loc[par.pname == "csub",:]
+    
+    par.loc[:,"partied"] = np.nan
+
+    ppar = par.loc[par.pname == "csub",:].copy()
+    print(ppar)
     par.loc[ppar.parnme,"parlbnd"] = ppar.parval1 * 0.05
     par.loc[ppar.parnme,"parubnd"] = ppar.parval1 * 20.0
-    par.loc[ppar.parnme,"pargp"] = ppar.apply(lambda x: x.usecol+"_"+x.k,axis=1)
+    par.loc[ppar.parnme,"pargp"] = ppar.apply(lambda x: "csub_{0}_k{1}_icsubno{2}".format(x.usecol,x.layer,x.icsubno),axis=1)
+    #par.loc[ppar.parnme,"pargp"] = ppar.apply(lambda x: x.usecol+"_"+x.k,axis=1)
 
     rpar = par.loc[par.parnme.str.contains("rnb"),:]
     par.loc[rpar.parnme,"parlbnd"] = 1.0
+    #par.loc[ppar.parnme,"partrans"] = "fixed"
 
-    if estimate_clay_thickness:
-        ppar = par.loc[par.parnme.str.contains("rnb"),:]
-        par.loc[ppar.parnme,"partrans"] = "fixed"
-        ppar = par.loc[par.parnme.str.contains("thick_frac"),:]
-        par.loc[ppar.parnme,"partrans"] = "fixed"
+
+
+    # if estimate_clay_thickness or rpar.shape[0] > gwf.dis.nlay.data+1:
+    # #raise Exception("estimate_clay_thickness is not implemented with multiple interbeds")
+    #     ppar = par.loc[par.parnme.str.contains("rnb"),:]
+    #     par.loc[ppar.parnme,"partrans"] = "fixed"
+    #     ppar = par.loc[par.parnme.str.contains("thick-frac"),:]
+    #     par.loc[ppar.parnme,"partrans"] = "fixed"
+       
         # ppar = par.loc[par.parnme.str.contains("clay_thickness_pstyle"),:].copy()
         # print(ppar)
         # assert ppar.shape[0] == nlay
         # ppar["k"] = ppar.k.astype(int) + 1
-        # par.loc[ppar.parnme.values,"parubnd"] = ppar.k.apply(lambda x: thickness[k])
+        # par.loc[ppar.parnme.values,"parubnd"] = ppar.k.apply(lambda x: thickness[k]) 
 
-        
 
-    ppar = par.loc[par.parnme.str.contains("theta"),:]
-    par.loc[ppar.parnme,"parlbnd"] = ppar.parval1.values - 0.3
-    par.loc[ppar.parnme,"parubnd"] = ppar.parval1.values + 0.3
+    ppar = par.loc[par.usecol=="rnb",:].copy()
+    assert ppar.shape[0] > 0
+    par.loc[ppar.parnme,"partrans"] = "none"
+    par.loc[ppar.parnme,"parubnd"] = par.loc[ppar.parnme,"parval1"] * 3
+    par.loc[ppar.parnme,"parlbnd"] = 1 #ppar.parval1.apply(lambda x: max(1,x*0.3333))
+    
+    ppar = par.loc[par.usecol=="thick-frac",:].copy()
+    assert ppar.shape[0] > 0
+    par.loc[ppar.parnme,"partrans"] = "none"
+    
+    par.loc[ppar.parnme,"parubnd"] = par.loc[ppar.parnme,"parval1"] * 3
+    par.loc[ppar.parnme,"parlbnd"] = par.loc[ppar.parnme,"parval1"] * 0.333 
 
-    ppar = par.loc[par.parnme.str.contains("kv"),:]
+    ppar = par.loc[par.usecol=="theta",:].copy()
+    assert ppar.shape[0] > 0
+    #ppar = par.loc[par.parnme.str.contains("theta"),:]
+    #par.loc[ppar.parnme,"parlbnd"] = ppar.parval1.apply(lambda x: max(0.01,x - 0.3))
+    #par.loc[ppar.parnme,"parubnd"] = ppar.parval1.apply(lambda x: min(0.35,x + 0.3))
+    par.loc[ppar.parnme,"parlbnd"] = 0.01
+    par.loc[ppar.parnme,"parubnd"] = 0.45
+
+
+    ppar = par.loc[par.usecol=="kv",:].copy()
+    assert ppar.shape[0] > 0
+    #par.loc[ppar.parnme.values[1:],"partrans"] = "tied"
+    #par.loc[ppar.parnme.values[1:],"partied"] = ppar.parnme.values[0]
     par.loc[ppar.parnme,"parlbnd"] = 1e-9
     par.loc[ppar.parnme,"parubnd"] = 1e-3
 
 
     ppar = par.loc[par.parnme.str.contains("pcs0"),:]
     par.loc[ppar.parnme,"partrans"] = "none"
-    par.loc[ppar.parnme,"parlbnd"] = ppar.parval1.values - 100
-    par.loc[ppar.parnme,"parubnd"] = ppar.parval1.values + 100
+    par.loc[ppar.parnme,"parlbnd"] = ppar.parval1.values - pcs0_range
+    par.loc[ppar.parnme,"parubnd"] = ppar.parval1.values + pcs0_range
 
     ppar = par.loc[par.parnme.str.contains("h0"),:]
+    assert ppar.shape[0] > 0
     par.loc[ppar.parnme,"partrans"] = "none"
-    par.loc[ppar.parnme,"parlbnd"] = ppar.parval1.values - 100
-    par.loc[ppar.parnme,"parubnd"] = ppar.parval1.values + 100
+    #par.loc[ppar.parnme.values[1:],"partrans"] = "tied"
+    #par.loc[ppar.parnme.values[1:],"partied"] = ppar.parnme.values[0]
+    par.loc[ppar.parnme,"parlbnd"] = ppar.parval1.values - pcs0_range
+    par.loc[ppar.parnme,"parubnd"] = ppar.parval1.values + pcs0_range
+
+
+    # ppar = par.loc[par.usecol=="ssv-cc",:].copy()
+    # assert ppar.shape[0] > 0
+    # par.loc[ppar.parnme.values[1:],"partrans"] = "tied"
+    # par.loc[ppar.parnme.values[1:],"partied"] = ppar.parnme.values[0]
+    # #par.loc[ppar.parnme,"parlbnd"] = ppar.parval1.values * 0.1
+    # #par.loc[ppar.parnme,"parubnd"] = ppar.parval1.values * 10
+
+    # ppar = par.loc[par.usecol=="sse-cr",:].copy()
+    # assert ppar.shape[0] > 0
+    # par.loc[ppar.parnme.values[1:],"partrans"] = "tied"
+    # par.loc[ppar.parnme.values[1:],"partied"] = ppar.parnme.values[0]
+    # #par.loc[ppar.parnme,"parlbnd"] = ppar.parval1.values * 0.1
+    # #par.loc[ppar.parnme,"parubnd"] = ppar.parval1.values * 10
+
+    # ppar = par.loc[par.usecol=="kv",:].copy()
+    # assert ppar.shape[0] > 0
+    # par.loc[ppar.parnme.values[1:],"partrans"] = "tied"
+    # par.loc[ppar.parnme.values[1:],"partied"] = ppar.parnme.values[0]
+    # #par.loc[ppar.parnme,"parlbnd"] = ppar.parval1.values * 0.1
+    # #par.loc[ppar.parnme,"parubnd"] = ppar.parval1.values * 10
+
+
+    #print(par.loc[par.partrans=="tied","partied"])
+    #exit()
+
+    if tie_ib_by_layer == "all":
+
+        ppar = par.loc[par.pname == "csub",:].copy()
+        ppar["layer"] = ppar.layer.astype(int)
+    
+        usecols = ppar.usecol.unique()
+        for usecol in usecols:
+            if usecol in ["rnb","thick-frac"]:
+                continue
+            upar = ppar.loc[ppar.usecol==usecol,:].copy()
+            if upar.shape[0] <= 1:
+                continue
+            upar.sort_values(by="parnme",inplace=True)
+            names = upar.parnme.values
+            #print(layer,usecol,names)
+            par.loc[names[1:],"partrans"] = "tied"
+            par.loc[names[1:],"partied"] = names[0]
+
+    elif tie_ib_by_layer is True:
+
+        ppar = par.loc[par.pname == "csub",:].copy()
+        ppar["layer"] = ppar.layer.astype(int)
+        layers = ppar.layer.unique()
+        layers.sort()
+        for layer in layers:
+            laypar = ppar.loc[ppar.layer==layer,:].copy()
+            usecols = laypar.usecol.unique()
+            for usecol in usecols:
+                if usecol in ["rnb","thick-frac"]:
+                    continue
+                upar = laypar.loc[laypar.usecol==usecol,:].copy()
+                if upar.shape[0] <= 1:
+                    continue
+                upar.sort_values(by="parnme",inplace=True)
+                names = upar.parnme.values
+                #print(layer,usecol,names)
+                par.loc[names[1:],"partrans"] = "tied"
+                par.loc[names[1:],"partied"] = names[0]
+       
+
+
 
     #set the % discrep obs to zero weight bc just a lil noise in the solution causes a big discrep
     obs = pst.observation_data
-    obs.loc[obs.usecol=="percent-discrepancy","weight"] = 0.0
+    obs.loc[obs.usecol=="percent-discrepancy","weight"] = 0.0 # todo check for hpastas
 
     #set the weight for first stress period csub obs to zero since it gets a null value
-    dobs = obs.loc[obs.usecol.apply(lambda x: "precon" in x or "delay" in x and "minus" not in x),:].copy()
+    dobs = obs.loc[obs.usecol.apply(lambda x: "precon" in x or "delay" in x and "minus" not in x and "lowest" not in x),:].copy()
 
     dobs["datetime"] = pd.to_datetime(dobs["datetime"])
     min_dt = dobs["datetime"].min()
@@ -654,13 +852,15 @@ def setup_pst(org_d, site_name, template_ws=None, num_reals=100,include_ghb_pars
     #pyemu.os_utils.run("pestpp-ies pest.pst",cwd=template_ws)
     #print(raw_csub_df)
     #print(raw_csub_df.cdelay.str.lower().values)
-    if "delay" not in pkg_df.cdelay.str.lower().values:
+    if "delay" not in csubdf.cdelay.str.lower().values:
         print("fixing delay-form-specific parameters")
         delay_tags = ["kv","rnb","h0"]
         par = pst.parameter_data
         for tag in delay_tags:
             par.loc[par.parnme.str.contains(tag),"partrans"] = "fixed"
         pst.parameter_data = par
+
+    # -------- ghb head parameters
 
     # tie the predictive ghb levels to the last historic level
     # big assumption - only one predictive stress period!
@@ -683,18 +883,47 @@ def setup_pst(org_d, site_name, template_ws=None, num_reals=100,include_ghb_pars
     # assert par.loc[par.partrans=="tied",:].shape[0] == len(gpar.k.unique())
 
     par = pst.parameter_data
-    par["partied"] = np.nan
+    
     gpar = par.loc[par.pname == "ghbhead", :].copy()
     if gpar.shape[0] > 0:
+        #gpar = gpar.loc[gpar.datetime.dt.year > 2024, :]
+        #assert gpar.shape[0] > 0
+        #par.loc[gpar.parnme, "partrans"] = "fixed"
         gpar["datetime"] = pd.to_datetime(gpar.datetime, format="%Y-%m-%d")
-        gpar = gpar.loc[gpar.datetime.dt.year > 2024, :]
-        assert gpar.shape[0] > 0
-        par.loc[gpar.parnme, "partrans"] = "fixed"
 
+        # years = [1950,1970,1990,2015]
+        # bnds = [70,40,30,5]
+        # par.loc[gpar.parnme,"parubnd"] = bnds[-1]
+        # par.loc[gpar.parnme,"parlbnd"] = -bnds[-1]
+        # for year,bnd in zip(years[::-1],bnds[::-1]):
+        #     ypar = gpar.loc[gpar.datetime.dt.year < year,:]
+        #     par.loc[ypar.parnme,"parubnd"] = bnd
+        #     par.loc[ypar.parnme,"parlbnd"] = -bnd
+        mxbnd = 120
+        mnbnd = 30
+        mxyear = 2015
+
+        mnyear = gpar.datetime.dt.year.min()
+        rate = (mxbnd-mnbnd)/(mxyear-mnyear)
+        gpar["parubnd"] = gpar.datetime.apply(lambda x: mxbnd - ((x.year - mnyear)*rate))
+        gpar.loc[gpar.datetime.dt.year>=2015,"parubnd"] = mnbnd
+        gpar.loc[gpar.datetime.dt.year>=2024,"parubnd"] = 0.01
+        gpar["parlbnd"] = -1. * gpar.parubnd
+        par.loc[gpar.parnme,"parubnd"] = gpar.parubnd
+        par.loc[gpar.parnme,"parlbnd"] = gpar.parlbnd
+        
+        
+        
+       
+            
+
+
+    # ghb head direct grid pars (one direct grid par/stress period/layer): fix pars
     dpar = par.loc[par.pname == "directghbhead", :].copy()
     if dpar.shape[0] > 0:
         par.loc[dpar.parnme, "partrans"] = "fixed"
 
+    # ghb head monthly pars
     jpar = par.loc[par.pname=="monthlyghbhead",:].copy()
     if jpar.shape[0] > 0:
 
@@ -715,7 +944,7 @@ def setup_pst(org_d, site_name, template_ws=None, num_reals=100,include_ghb_pars
                     #print("...",upar.parnme)
                     par.loc[upar.parnme.iloc[1:],'partied'] = upar.parnme.iloc[0]
 
-
+    # ghb head annual pars
     apar = par.loc[par.pname=="annualghbhead",:].copy()
     if apar.shape[0] > 0:
 
@@ -738,11 +967,40 @@ def setup_pst(org_d, site_name, template_ws=None, num_reals=100,include_ghb_pars
                     #print(uyear,upar.parnme.iloc[0])
                     par.loc[upar.parnme.iloc[1:],'partied'] = upar.parnme.iloc[0]
 
+    # if include_pastas: # todo?
+    #     par.pname.unique() # ['consthead', 'ghbhead', 'directghbhead', 'csub', 'cg', 'k33']
+    #     par.pargp.unique() # ['consthead', 'ghbhead', 'directghbhead', 'pcs0_-1', 'thick_-1',
+    #     #        'rnb_-1', 'ssv_-1', 'sse_-1', 'theta_-1', 'kv_-1', 'h0_-1',
+    #     #        'clay_-1', 'pcs0_0', 'thick_0', 'rnb_0', 'ssv_0', 'sse_0',
+    #     #        'theta_0', 'kv_0', 'h0_0', 'clay_0', 'pcs0_1', 'thick_1', 'rnb_1',
+    #     #        'ssv_1', 'sse_1', 'theta_1', 'kv_1', 'h0_1', 'clay_1', 'pcs0_2',
+    #     #        'thick_2', 'rnb_2', 'ssv_2', 'sse_2', 'theta_2', 'kv_2', 'h0_2',
+    #     #        'clay_2', 'cg_ske_cr', 'cg_theta', 'k33_k:0', 'k33_k:1', 'k33_k:2',
+    #     #        'k33_k:3']
+    #     # set some better prior parameter estimates
+    #     par = pst.parameter_data
+    #     ppar = par.loc[par.pname == 'pastas', :].copy()
+    #     for parnme, pastaname in zip(ppar.index, ppar.pastaname.values):
+    #         transform = "none"
+    #         if not pastas_pars.loc[pastaname, "vary"]:
+    #             transform = "fixed"
+    #         par.loc[parnme, "partrans"] = transform
+    #         par.loc[parnme, "pargp"] = pastaname
+    #         par.loc[parnme, "parubnd"] = pastas_pars.loc[pastaname, "pmax"]
+    #         par.loc[parnme, "parlbnd"] = pastas_pars.loc[pastaname, "pmin"]
+    #         par.loc[parnme, "standard_deviation"] = max(0.001, np.abs(par.loc[parnme, "parval1"]) * 0.3)
+    #         if "trend-a" in parnme:
+    #             par.loc[parnme, "standard_deviation"] = 0.001
+    #         if not include_pastas_pars:
+    #             par.loc[parnme, "partrans"] = "fixed"
 
+    pst.parameter_data = par
     pf.pst = pst
     np.random.seed(pyemu.en.SEED)
     pe = pf.draw(num_reals=num_reals, use_specsim=False) 
 
+    # ghb head additive grid pars (one grid additive par/stress period/layer): select historical pars
+    par = pst.parameter_data
     gpar = par.loc[par.pname == "ghbhead", :].copy()
     gpar = gpar.loc[gpar.partrans!="fixed",:]
 
@@ -753,6 +1011,7 @@ def setup_pst(org_d, site_name, template_ws=None, num_reals=100,include_ghb_pars
         ghb_tpar_dfs = []
         for k in kvals:
             kpar = gpar.loc[gpar.k==k,:].copy()
+            # number of days since the min datetime in the current layer
             kpar['x'] = (kpar.datetime - kpar.datetime.min()).dt.days
             kpar["y"] = 0.0
             ghb_tpar_dfs.append(kpar.copy())
@@ -774,7 +1033,7 @@ def setup_pst(org_d, site_name, template_ws=None, num_reals=100,include_ghb_pars
     pst.pestpp_options["ies_par_en"] = "prior_pe.jcb"
 
     pst.write(os.path.join(template_ws, 'pest.pst'), version=2)
-   
+ 
     files = ["ies_functions.py","model_functions.py","workflow.py"]
     files = [f for f in os.listdir(".") if f.endswith(".py")]
     for f in files:
@@ -782,7 +1041,33 @@ def setup_pst(org_d, site_name, template_ws=None, num_reals=100,include_ghb_pars
     shutil.copy2(os.path.join(site_name,"prep_data.py"),os.path.join(template_ws,"prep_data.py.txt"))
     shutil.copytree(os.path.join(site_name,"source_data"),os.path.join(template_ws,"source_data"))
     shutil.copytree(os.path.join(site_name,"processed_data"),os.path.join(template_ws,"processed_data"))
-      
+
+def test_csv_to_csub(ws):
+    names=["icsubno","layer","row","column","cdelay","pcs0","thick-frac",
+           "rnb","ssv-cc","sse-cr","theta","kv","h0"]
+    df = pd.read_csv(os.path.join(ws,"model.csub_packagedata.txt"),
+                     header=None,sep="\s+",names=names)
+    #sim = flopy.mf6.MFSimulation.load(sim_ws=ws)
+    #thickness = sim.get_model().dis.thickness.array
+    #np.savetxt(os.path.join(ws,"thickness.dat"),thickness)
+    df.to_csv(os.path.join(ws,"model.csub_packagedata.txt.csv"),index=False)
+    return csv_to_csub(ws)
+
+def csv_to_csub(ws="."):
+    df = pd.read_csv(os.path.join(ws,"model.csub_packagedata.txt.csv"))
+    # thickness = np.loadtxt(os.path.join(ws,"thickenss.dat"))
+    # for k,thk in enumerate(thickness):
+    #     kdf = df.loc[df.layer==k+1,:]
+    #     kdf["gwf-clay-thickness"] = kdf.thick_frac * kdf.rnb
+    #     kdf["gwf-to-csub-ratio"] = kdf["gwf-clay-thickness"] / thk
+    #     kdf.loc[df["gwf-to-csub-ratio"]>1.0,"thick_frac"] = 0.99 * (kdf["thick_frac"] / kdf.loc[kdf["gwf-to-csub-ratio"]>1.0,"gwf-to-csub-ratio"])
+        
+
+    df.to_csv(os.path.join(ws,"model.csub_packagedata.txt"),sep=" ",header=False,index=False)
+    df["sse2ssv-ratio"] = df["sse-cr"] / df["ssv-cc"]
+    df.to_csv(os.path.join(ws,"model.csub_packagedata.txt.csv"),index=False)
+
+    return df
 
 
 def test_enforce_ghb_botm(d):
@@ -810,20 +1095,21 @@ def enforce_ghb_botm(nlay=3):
         df["bhead"] = [bh if bh > botm_dict[lay - 1] else botm_dict[lay - 1] for lay, bh in zip(df.l, df.bhead)]
         df.to_csv(f, header=False, index=False, sep=" ")
     ghb_files = [f for f in os.listdir('.') if f.startswith('model.ghb_stress_period_data') and f.endswith(".txt")]
-    
-    for f in ghb_files:
-        df = pd.read_csv(f,header=None,names=["l","r","c","bhead","cond"],sep="\\s+")
-        df["bhead"] = [bh if bh > botm_dict[lay-1] else botm_dict[lay-1] for lay,bh in zip(df.l,df.bhead) ]
-        df.to_csv(f,header=False,index=False,sep=" ")
 
-def test_ghbhead_to_csv(t_d):
+    # note cc: this did exactly the same thing as above, commented it (checked with JW))
+    # for f in ghb_files:
+    #     df = pd.read_csv(f,header=None,names=["l","r","c","bhead","cond"],sep="\\s+")
+    #     df["bhead"] = [bh if bh > botm_dict[lay-1] else botm_dict[lay-1] for lay,bh in zip(df.l,df.bhead) ]
+    #     df.to_csv(f,header=False,index=False,sep=" ")
+
+def test_ghbhead_to_csv(t_d,export=True):
     b_d = os.getcwd()
     os.chdir(t_d)
-    df = ghbhead_to_csv()
+    df = ghbhead_to_csv(export)
     os.chdir(b_d)
     return df
     
-def ghbhead_to_csv():
+def ghbhead_to_csv(export=True):
     ghb_files = [f for f in os.listdir('.') if f.startswith("model.ghb_stress") and f.endswith(".txt")]
     ghb_kper = [int(f.split(".")[1].split('_')[-1])-1 for f in ghb_files]
     
@@ -852,7 +1138,8 @@ def ghbhead_to_csv():
     df.sort_values(by=["k","datetime"],inplace=True)
     df.index = np.arange(df.shape[0])
     df.index.name="count"
-    df.to_csv("ghb.csv")
+    if export:
+        df.to_csv("ghb.csv")
     return df
     #print(df)
 
@@ -878,8 +1165,7 @@ def set_obsvals_and_weights(obs_file,t_d,num_reals=100,use_focus_weights=False,
            (`should_assimilate` is set in some of the site specific prep_data() functions
            for dodgy or questionable observations)
     """
-
-    # grp_stdev_abs_dict = {'total_subsidence': 0.5} 
+    # grp_stdev_abs_dict = {'total_subsidence': 0.5}
 
     assert os.path.exists(obs_file),obs_file
 
@@ -908,7 +1194,9 @@ def set_obsvals_and_weights(obs_file,t_d,num_reals=100,use_focus_weights=False,
     odf.sort_values(by="datetime",inplace=True)
     pst = pyemu.Pst(os.path.join(t_d, 'pest.pst'))
 
-    obs = pst.observation_data    
+    obs = pst.observation_data
+
+    # initialize
     obs.loc[:,"weight"] = 0.0
     obs.loc[:,"standard_deviation"] = np.nan
     obs.loc[:,"lower_bound"] = 0.0
@@ -916,6 +1204,25 @@ def set_obsvals_and_weights(obs_file,t_d,num_reals=100,use_focus_weights=False,
     obs.loc[:,"source"] = "mf6"
     obs.loc[:,"lower_bound"] = np.nan
     obs.loc[:,"is_verf"] = False
+    obs.loc[:,"drop_violations"] = False
+
+    robs = obs.loc[obs.usecol=="sse2ssv-ratio",:].copy()
+    assert robs.shape[0] > 0
+    obs.loc[robs.obsnme,"obsval"] = 0.1
+    obs.loc[robs.obsnme,"obgnme"] = "less_than_ratio"
+    obs.loc[robs.obsnme,"weight"] = 1
+    penalty_count = robs.shape[0]
+   
+    
+    sobs = obs.loc[obs.oname=="ibstrain",:] 
+    sobs = sobs.loc[sobs.usecol=="percent-compaction",:]
+    assert sobs.shape[0] > 0
+    obs.loc[sobs.obsnme,"obsval"] = 100.0
+    obs.loc[sobs.obsnme,"weight"] = 1e6
+    #obs.loc[sobs.obsnme,"observed"] = True
+    obs.loc[sobs.obsnme,"obgnme"] = "less_than_strain"
+    obs.loc[sobs.obsnme,"drop_violations"] = True
+    penalty_count += sobs.shape[0]
 
     site = obs_file.split(os.path.sep)[0]
     ghb_obs_filename = os.path.join(site,"processed_data","{0}.orgts_data.csv".format(site))
@@ -956,14 +1263,19 @@ def set_obsvals_and_weights(obs_file,t_d,num_reals=100,use_focus_weights=False,
                 ghb_count += 1
 
 
+    # subsidence obs
     sobs = obs.loc[obs.usecol=="sim-subsidence-ft",:].copy()
     assert sobs.shape[0] > 0
     sobs["datetime"] = pd.to_datetime(sobs.datetime,format="%Y%m%d")
     sobs.sort_values(by="datetime",inplace=True)
+
+    # unique dates
     udts = np.unique(sobs.datetime.values)
     udts.sort()
     print(udts)
     # exit()
+
+    # prepare odf dataframe
     datetimes,sub,source,count = [],[],[],[]
     start_datetimes,org_datetimes = [],[]
     should_assimilate = []
@@ -990,16 +1302,22 @@ def set_obsvals_and_weights(obs_file,t_d,num_reals=100,use_focus_weights=False,
         org_datetimes.append("-".join([dt.strftime("%Y%m%d") for dt in udf.datetime.tolist()]))
 
     deltas = (sobs["datetime"].iloc[1:] - sobs["datetime"].iloc[:-1]).dt.days
+
+    # create odf dataframe and export to csv
     odf = pd.DataFrame(data={"datetime":datetimes,"subsidence_ft":sub,"source":source, "count":count,
         "start_datetime":start_datetimes,"org_datetimes":org_datetimes,"should_assimilate":should_assimilate},index=datetimes)
     odf["org_subsidence_ft"] = odf.subsidence_ft.copy()
     odf["subsidence_ft"] -= odf.subsidence_ft.min() #reset to 0.0 sub at the start
     odf.to_csv(os.path.join(t_d,"sampled_obs.csv"))
+
     deltas = np.array(deltas)
-    
+
+    # subsidence quantiles
     xquants = np.array([0.0,0.33,0.66,1.0])
     yquants = np.array([np.nanquantile(odf.subsidence_ft.values,x) for x in xquants])
     nquants = ["lower_third","lower-third","middle-third","upper-third"]
+
+    # use odf dataframe to modify obs
     count = 0
     verf_count = 0
     skipped = 0
@@ -1007,6 +1325,7 @@ def set_obsvals_and_weights(obs_file,t_d,num_reals=100,use_focus_weights=False,
     sub_max = -1e30
     for dt,subval,src,should_assimilate in zip(odf.datetime,odf.subsidence_ft,odf.source,odf.should_assimilate):
 
+        # compute distance
         sobs["distance"] = (dt - sobs.datetime).dt.days.apply(np.abs)
         if sobs.distance.min() >  (deltas.mean() * 1.5):
             print('...sub datum too far to interpolate',dt,subval,src)
@@ -1014,11 +1333,14 @@ def set_obsvals_and_weights(obs_file,t_d,num_reals=100,use_focus_weights=False,
             continue
         sobs.sort_values(by="distance",inplace=True)
         #print(dt,sobs.distance.describe())
-        
+
+        # get oname
         idxmin = sobs.obsnme.iloc[0]
         mobs = sobs.loc[[idxmin],:]
         assert mobs.shape[0] == 1
         oname = mobs.obsnme.values[0]
+
+        # assign observed, obsval, source
         sub_max = max(subval,sub_max)
         if obs.loc[oname,"observed"] == True:
             print(oname)
@@ -1027,21 +1349,27 @@ def set_obsvals_and_weights(obs_file,t_d,num_reals=100,use_focus_weights=False,
         obs.loc[oname,"observed"] = True
         obs.loc[oname,"obsval"] = subval
         obs.loc[oname,"source"] = src
+
+        # assign weight and lower_bound
         if should_assimilate:
             obs.loc[oname,"weight"] = 1.0
         else:
             #obs.loc[oname,"weight"] = 0.25
             skipped += 1
         obs.loc[oname,"lower_bound"] = 0.0
+
         for i,(x,y,n) in enumerate(zip(xquants[:-1],yquants[:-1],nquants[:-1])):
             if subval >= y and subval < yquants[i+1]:
                 break
 
+        # assign obgnme
         decade = int(dt.year/10) * 10
-
         obs.loc[oname,"obgnme"] += "_weightquant:"+nquants[i+1]+"_decade:{0}".format(decade)
-        if use_focus_weights is not None and use_focus_weights and dt.year > 2000:
+
+        # modify weight and is_verf
+        if use_focus_weights is not None and use_focus_weights and dt.year > 2020:
             obs.loc[oname,"weight"] *= 3
+
         if verf_start is not None:
             if dt > verf_start and dt <= verf_end:
                 obs.loc[oname,"weight"] = 0.0
@@ -1049,16 +1377,41 @@ def set_obsvals_and_weights(obs_file,t_d,num_reals=100,use_focus_weights=False,
                 verf_count += 1
                 if not should_assimilate:
                     skipped -= 1
-        if dt.year < 1950 and odf["subsidence_ft"].max() > 5.0:
-            obs.loc[oname,"standard_deviation"] = 0.15
-        elif "ext" not in src:
-            obs.loc[oname,"standard_deviation"] = 0.05#max(0.0001,subval * 0.25)
-            # obs.loc[oname, "standard_deviation"] = 0.05 #testLessNoise
-        elif "ext" in src:
-            obs.loc[oname,"standard_deviation"] = 0.05#max(0.0001,subval * 0.25)
-            # obs.loc[oname, "standard_deviation"] = 0.05 #testLessNoise
+
+        # # assign standard_deviation
+        # if dt.year < 1950 and odf["subsidence_ft"].max() > 5.0:
+        #     obs.loc[oname,"standard_deviation"] = 0.15
+        # elif "ext" not in src:
+        #     obs.loc[oname,"standard_deviation"] = 0.05#max(0.0001,subval * 0.25)
+        #     # obs.loc[oname, "standard_deviation"] = 0.05 #testLessNoise
+        # elif "ext" in src:
+        #     obs.loc[oname,"standard_deviation"] = 0.05#max(0.0001,subval * 0.25)
+        #     # obs.loc[oname, "standard_deviation"] = 0.05 #testLessNoise
+        # else:
+        #     raise Exception("unknown source: {0}".format(src))
+
+        # assign standard_deviation
+        if dt.year < 1950:
+            obs.loc[oname,"standard_deviation"] = 0.5
+        elif dt.year < 1970:
+            obs.loc[oname,"standard_deviation"] = 0.4
+        elif dt.year < 1990:
+            obs.loc[oname,"standard_deviation"] = 0.3
+        elif dt.year < 2015:
+            obs.loc[oname,"standard_deviation"] = 0.2
         else:
-            raise Exception("unknown source: {0}".format(src))
+            obs.loc[oname,"standard_deviation"] = 0.1
+
+
+            
+        # elif "ext" not in src:
+        #     obs.loc[oname,"standard_deviation"] = 0.05#max(0.0001,subval * 0.25)
+        #     # obs.loc[oname, "standard_deviation"] = 0.05 #testLessNoise
+        # elif "ext" in src:
+        #     obs.loc[oname,"standard_deviation"] = 0.05#max(0.0001,subval * 0.25)
+        #     # obs.loc[oname, "standard_deviation"] = 0.05 #testLessNoise
+        # else:
+        #     raise Exception("unknown source: {0}".format(src))
         count += 1
     
     print(count," obs set")
@@ -1073,8 +1426,8 @@ def set_obsvals_and_weights(obs_file,t_d,num_reals=100,use_focus_weights=False,
     print("verf_count",verf_count)
     print("skipper",skipped)
     print("count",count)
-    assert pst.nnz_obs + verf_count + skipped == count + ghb_count
-    if pst.nnz_obs - ghb_count > odf.shape[0]:
+    assert pst.nnz_obs + verf_count + skipped == count + ghb_count + penalty_count
+    if pst.nnz_obs - ghb_count - penalty_count > odf.shape[0]:
         raise Exception("something is wrong")
     if pst.nnz_obs != odf.shape[0]:
         print("WARNING!!! not all observations mapped to a pest control file observation...")
@@ -1092,7 +1445,7 @@ def set_obsvals_and_weights(obs_file,t_d,num_reals=100,use_focus_weights=False,
         o1 = nzobs.obsnme.iloc[i]
         v1 = nzobs.obsval.iloc[i]
         dt1 = nzobs.datetime.iloc[i]
-        if dt1.year < 2010:
+        if dt1.year < 2015:
             continue
         if verf_start is not None:
             if dt1 > verf_start and dt1 <= verf_end:
@@ -1110,12 +1463,12 @@ def set_obsvals_and_weights(obs_file,t_d,num_reals=100,use_focus_weights=False,
             assert dname.shape[0] == 1
             obs.loc[dname,"obsval"] = v2 - v1
             obs.loc[dname,"observed"] = True
-            obs.loc[dname,"standard_deviation"] = max(0.00001,(v2 - v1)*0.01)
+            obs.loc[dname,"standard_deviation"] = max(0.001,(v2 - v1)*0.05)
             # obs.loc[dname, "standard_deviation"] = 0.000001 #testLessNoise
             if use_obs_diff:
                 obs.loc[dname,"weight"] = 1.0
-                if use_focus_weights and dt2.year > 2010:
-                    obs.loc[dname,"weight"] = 100
+                if use_focus_weights and dt2.year > 2020:
+                    obs.loc[dname,"weight"] *= 3
                 #if dt1.year > 2010:
                 #    obs.loc[dname,"weight"] *= 3
                 
@@ -1125,7 +1478,9 @@ def set_obsvals_and_weights(obs_file,t_d,num_reals=100,use_focus_weights=False,
     #if prefer_less_rebound:    
     cobs = obs.loc[obs.usecol.str.startswith("tdif-compaction."),:].copy()
     assert cobs.shape[0] > 0
-    obs.loc[cobs.index,"obsval"] = 0.0
+    cobs["datetime"] = pd.to_datetime(cobs.datetime)
+    cobs = cobs.loc[cobs.datetime<pd.to_datetime("1-1-2015"),:]
+    obs.loc[cobs.index,"obsval"] = -0.0014 #greater than 0.5/year
     obs.loc[cobs.index,"obgnme"] = "greater_than_rebound"
     obs.loc[cobs.index,"weight"] = 1
 
@@ -1142,11 +1497,12 @@ def set_obsvals_and_weights(obs_file,t_d,num_reals=100,use_focus_weights=False,
     # obs.loc[cobs.index,"weight"] = 100.0
     
     iobs = obs.loc[obs.usecol=="implied-thick-diff",:]
-    assert iobs.shape[0] > 0
-    obs.loc[iobs.obsnme,"obsval"] = 0.0
-    obs.loc[iobs.obsnme,"obgnme"] = "claydiff"
-    obs.loc[iobs.obsnme,"weight"] = 1.0
-    obs.loc[iobs.obsnme,"standard_deviation"] = 0.001
+    if iobs.shape[0] > 0:
+        assert iobs.shape[0] > 0
+        obs.loc[iobs.obsnme,"obsval"] = 0.0
+        obs.loc[iobs.obsnme,"obgnme"] = "claydiff"
+        obs.loc[iobs.obsnme,"weight"] = 1.0
+        obs.loc[iobs.obsnme,"standard_deviation"] = 0.001
 
     if prefer_less_delayedfuture:
         ht_dt1_year = 2024#pd.to_datetime("12-31-2024")
@@ -1180,7 +1536,7 @@ def set_obsvals_and_weights(obs_file,t_d,num_reals=100,use_focus_weights=False,
         tobs = obs.loc[obs.obgnme==grp,:].copy()
         tobs = tobs.loc[tobs.weight >0,:]
         assert tobs.shape[0] > 0
-        v = pyemu.geostats.ExpVario(contribution=1.0,a=7300)
+        v = pyemu.geostats.ExpVario(contribution=1.0,a=7300*5)
         gs = pyemu.geostats.GeoStruct(variograms=[v],name=grp)
         tag_names = tobs.obsnme.tolist()
         tobs["datetime"] = pd.to_datetime(tobs.datetime,format="%Y%m%d")
@@ -1189,7 +1545,7 @@ def set_obsvals_and_weights(obs_file,t_d,num_reals=100,use_focus_weights=False,
         struct_dict[gs] = tobs.obsnme.tolist()
         #print(grp)
 
-
+    # draw autocorrelated observation noise ensemble
     #print(pst.observation_data.loc[pst.nnz_obs_names,"distance"])
     oe = pyemu.helpers.autocorrelated_draw(pst,struct_dict,enforce_bounds=True,num_reals=num_reals)
     oe = oe.loc[:,pst.nnz_obs_names]
@@ -1198,33 +1554,61 @@ def set_obsvals_and_weights(obs_file,t_d,num_reals=100,use_focus_weights=False,
     obs["obgnme"] = obs.org_group
     pst.observation_data = obs
 
-    if use_focus_weights is not None and not use_focus_weights:
-        with open(os.path.join(t_d,"phi.csv"),'w') as f:
+    
+    nzobs = obs.loc[obs.weight>0,:]
+    # weight_vecs = {}
+    # for oname,weight in zip(nzobs.obsnme,nzobs.weight):
+    #     wv = np.zeros((oe.shape[0])) + weight
+    #     weight_vecs[oname] = wv
+    # df = pd.DataFrame(data=weight_vecs,index=oe.index)
+    # pyemu.ObservationEnsemble(pst=None,df=df).to_binary(os.path.join(t_d,"weight.jcb"))
+    # pst.pestpp_options["ies_weight_ensemble"] = "weight.jcb"
 
-            f.write("subdiff,0.1\n")
-            f.write("lower-third,{0}\n".format(0.3))
-            f.write("middle-third,{0}\n".format(0.3))
-            f.write("upper-third,{0}\n".format(0.3))
-            f.write("greater_than_rebound,{0}\n".format(prefer_less_rebound))
-            f.write("claydiff,{0}\n".format(0.15))
-            f.write("less_than_htobs,{0}\n".format(0.15))
-            f.write("ghbhead,0.1\n")
-            # f.write("subdiff,1e-20\n")
-            # f.write("lower-third,1e-20\n")
-            # f.write("middle-third,1e-20\n")
-            # f.write("upper-third,1e-20\n")
-            # f.write("greater_than_rebound,1e-20\n")
-            # f.write("claydiff,1e-20\n")
-            # f.write("less_than_htobs,1e-20\n")
-            # f.write("ghbhead,1.0\n")
-                    
-        pst.pestpp_options["ies_phi_factor_file"] = "phi.csv"
 
+    # create phi factor file
+    #if use_focus_weights is not None and not use_focus_weights:
+    with open(os.path.join(t_d,"phi.csv"),'w') as f:
+
+        f.write("subdiff,0.05\n")
+        f.write("lower-third,{0}\n".format(0.1))
+        f.write("middle-third,{0}\n".format(0.2))
+        f.write("upper-third,{0}\n".format(0.2))
+        f.write("greater_than_rebound,{0}\n".format(prefer_less_rebound))
+        if iobs.shape[0] > 0:
+            f.write("claydiff,{0}\n".format(0.05))
+        f.write("less_than_htobs,{0}\n".format(0.1))
+        f.write("ghbhead,1e-10\n")
+        f.write("less_than_strain,0.1\n")
+        f.write("less_than_ratio,0.1\n")
+        # f.write("subdiff,1e-20\n")
+        # f.write("lower-third,1e-20\n")
+        # f.write("middle-third,1e-20\n")
+        # f.write("upper-third,1e-20\n")
+        # f.write("greater_than_rebound,1e-20\n")
+        # f.write("claydiff,1e-20\n")
+        # f.write("less_than_htobs,1e-20\n")
+        # f.write("ghbhead,1.0\n")
+    df = pd.read_csv(os.path.join(t_d,"phi.csv"),header=None,names=["tag","fac"])
+
+    # fac_vecs = {}
+    # for tag,fac in zip(df.tag,df.fac):
+    #     fv = np.zeros((oe.shape[0])) + fac
+    #     fac_vecs[tag] = fv
+    # df = pd.DataFrame(data=fac_vecs,index=oe.index)
+    # df.to_csv(os.path.join(t_d,"phi.csv"))
+    # pst.pestpp_options["ies_phi_factors_by_real"] = True
+
+
+
+                
+    pst.pestpp_options["ies_phi_factor_file"] = "phi.csv"
+    
     pst.control_data.noptmax = -2
     # save binary formats
     pst.pestpp_options["ies_save_binary"] = True
     pst.write(os.path.join(t_d, "pest.pst"),version=2)
 
+    # test run
     pyemu.os_utils.run("pestpp-ies pest.pst",cwd=os.path.join(t_d))
     pst = pyemu.Pst(os.path.join(t_d,"pest.pst"))
     assert pst.phi > 1e-6 #greater than numerical noise
@@ -1372,20 +1756,33 @@ def plot_en_compaction(m_d, noptmax=None):
     tdcobs["datetime"] = pd.to_datetime(tdcobs.datetime)
     
     
-    pobs = obs.loc[obs.usecol.str.contains("preconstress"),:].copy()
-    assert pobs.shape[0] > 0
+    #pobs = obs.loc[obs.usecol.str.contains("preconstress"),:].copy()
+    #assert pobs.shape[0] > 0
+    #pobs["datetime"] = pd.to_datetime(pobs.datetime,format="%Y%m%d")
 
-    pobs["datetime"] = pd.to_datetime(pobs.datetime,format="%Y%m%d")
+    dlobs = obs.loc[obs.usecol.str.startswith("delaylowest"),:].copy()
+    gmdlobs = obs.loc[obs.usecol.str.startswith("gwf-minus-delaylowest"),:].copy()
+    gmdobs = obs.loc[obs.usecol.str.startswith("gwf-minus-delay."),:].copy()
+    dobs = obs.loc[obs.usecol.str.startswith("delay-head"),:].copy()
+    
+
+    for oo in [dobs,dlobs,gmdobs,gmdlobs]:
+        assert oo.shape[0] > 0
+        oo["layer"] = oo.usecol.apply(lambda x: int(x.split(".")[1]))
+        oo["icsubno"] = oo.usecol.apply(lambda x: int(x.split(".")[2]))
+        oo["node"] = oo.usecol.apply(lambda x: int(x.split(".")[3]))
+        oo["datetime"] = pd.to_datetime(oo.datetime)
+        
 
     hobs = obs.loc[obs.oname=="hds",:].copy()
     assert hobs.shape[0] > 0
     hobs["k"] = hobs.usecol.apply(lambda x: int(x.split(".")[1])) - 1
     hobs["datetime"] = pd.to_datetime(hobs.datetime)
 
-    dobs = obs.loc[obs.usecol.str.startswith("delay-head"),:]
-    assert dobs.shape[0] > 0
-    dobs["k"] = dobs.usecol.apply(lambda x: int(x.split(".")[1])) - 1
-    dobs["delay_node"] = dobs.usecol.apply(lambda x: int(x.split(".")[2])) - 1
+    
+
+    dobs["ibnum"] = dobs.usecol.apply(lambda x: int(x.split(".")[2])) - 1
+    dobs["delay_node"] = dobs.usecol.apply(lambda x: int(x.split(".")[3])) - 1
     
     dobs["datetime"] = pd.to_datetime(dobs.datetime)
 
@@ -1413,6 +1810,7 @@ def plot_en_compaction(m_d, noptmax=None):
         print(pt_en.columns)
         print(sobs.obsnme)
         ymax = max(obsobs.obsval.max(),pt_en.loc[:,sobs.obsnme].values.max())#np.round((nzobs.obsval.max() + 10.)/10.) * 10.
+        ymax = obsobs.obsval.max()*1.1
         ymin = min(obsobs.obsval.min(), 0)
         for uk,ax in zip(uks,axes[2:2+len(uks)]):
             uobs = gobs.loc[gobs.k==uk,:].copy()
@@ -1473,6 +1871,9 @@ def plot_en_compaction(m_d, noptmax=None):
         [ax.plot(dts, vals[i, :], color='b', lw=0.025, alpha=0.1,
                  label='posterior reals') for i in range(vals.shape[0])]
 
+        #ax.set_ylim(min(vals.min(),nzobs.obsval.min()),max(vals.max(),nzobs.obsval.max()))
+        ax.set_ylim(0.0,nzobs.obsval.max()*1.1)
+
         
         # if the "base" realization is found, plot it with a heavier line
        
@@ -1507,9 +1908,9 @@ def plot_en_compaction(m_d, noptmax=None):
             tmp = tmp.loc[tmp.weight > 0, :]
             #if tmp.shape[0] > 0:
             tmp.sort_values(by="datetime", inplace=True)
-            axes[1].scatter(tmp.datetime.values, tmp.obsval.values, marker="o", c=color[i], s=4,
+            axes[1].scatter(tmp.datetime.values, tmp.obsval.values, marker="o", c=color[i], s=15,
                     label=mtype,zorder=10)
-            axes[0].scatter(tmp.datetime.values, tmp.obsval.values, marker="o", c='r', s=4,
+            axes[0].scatter(tmp.datetime.values, tmp.obsval.values, marker="o", c='r', s=15,
                     label="assimilated",zorder=10)
 
             tmp2 = obsobs.loc[obsobs.source == mtype, :].copy()
@@ -1519,9 +1920,9 @@ def plot_en_compaction(m_d, noptmax=None):
             tmpd = obsobs.loc[diff,:].copy()
             tmpd.sort_values(by="datetime",inplace=True)
 
-            axes[1].scatter(tmpd.datetime.values, tmpd.obsval.values, marker="o", facecolors="none",alpha=0.5,edgecolors=color[i], s=50,
+            axes[1].scatter(tmpd.datetime.values, tmpd.obsval.values, marker="o", facecolors="none",alpha=0.5,edgecolors=color[i], s=70,
                             zorder=10)
-            axes[0].scatter(tmpd.datetime.values, tmpd.obsval.values, marker="o", s=50, alpha=0.5,edgecolors="r",facecolors="none",
+            axes[0].scatter(tmpd.datetime.values, tmpd.obsval.values, marker="o", s=70, alpha=0.5,edgecolors="r",facecolors="none",
                             label="observed", zorder=10)
         
         axes[0].set_title('total compaction obs vs sim with noise', loc="left")
@@ -1547,123 +1948,229 @@ def plot_en_compaction(m_d, noptmax=None):
         pdf.savefig()
         plt.close(fig)
         
-        uks = dobs.k.unique()
-        uks.sort()
+        ulayers = dlobs.layer.unique()
+        ulayers.sort()
         critical_results = {}
         mean_critical_results = {}
         delay_ib_lowestgw = {}
         gwfminusibgwl_df = {}
-        for uk in uks:
-            uhobs = hobs.loc[hobs.k==uk,:].copy()
-            uhobs.sort_values(by="datetime",inplace=True)
-            uudobs = dobs.loc[dobs.k==uk,:].copy()
-            unodes = uudobs.delay_node.unique()
-            unodes.sort()
+        for layer in ulayers:
+            
+            laydobs = dobs.loc[dobs.layer==layer,:].copy()
+            assert laydobs.shape[0] > 0
+            laydlobs = dlobs.loc[dlobs.layer==layer,:].copy()
+            assert laydlobs.shape[0] > 0
+            laygmdlobs = gmdlobs.loc[gmdlobs.layer==layer,:].copy()
+            assert laygmdlobs.shape[0] > 0
+            laygmdobs = gmdobs.loc[gmdobs.layer==layer,:].copy()
+            assert laygmdobs.shape[0] > 0
+            uibnums = laydlobs.icsubno.unique()
+            uibnums.sort()
+            print(layer,uibnums)
+            cmap = plt.get_cmap("jet")
+            norm = matplotlib.colors.Normalize(0,len(uibnums)-1)
+            
             fig,axes = plt.subplots(4,1,figsize=(11,8.5))
-            for node in unodes:
-                pt_color="b"
-                if node != unodes.min() and node != unodes.max():
-                    continue
-                if node == unodes.min():
-                    pt_color = "m"
-                else:
-                    continue
-                #elif node == unodes.max():
-                #    pt_color = "r"
-
-                udobs = uudobs.loc[uudobs.delay_node==node,:].copy()
-                udobs.sort_values(by="datetime",inplace=True) 
-                ax = axes[0]
-                hdts = uhobs.datetime.values
-                hvals = pt_en.loc[:,uhobs.obsnme].values
-                #[ax.plot(hdts,hvals[i,:],"0.5",lw=0.1,alpha=0.3) for i in range(hvals.shape)]
-                ddts = udobs.datetime.values
-                dvals = pr_en.loc[:,udobs.obsnme].values
-                #dvals[np.abs(dvals)>1e30] = np.nan
-                dvals[dvals==-999] = np.nan
-                prlowest = []
-                for i in range(dvals.shape[0]):
-                    lowest = []
-                    ddvals = dvals[i,:]
-                    for j in range(1,ddvals.shape[0]):
-                        lowest.append(np.nanmin(ddvals[:j]))
-                    prlowest.append(np.array(lowest))
-                prlowest = np.array(prlowest)
-                #prlowest = np.array([dvals[:i,:].min(axis=0).flatten() for i in range(1,dvals.shape[0])])
-                #prlowest[np.abs(prlowest)>1e30]= np.nan
+            for iii,ibnum in enumerate(uibnums):
+                udobs = laydobs.loc[laydobs.icsubno==ibnum,:].copy()
+                assert udobs.shape[0] > 0
+                udlobs = laydlobs.loc[laydlobs.icsubno==ibnum,:].copy()
+                assert udlobs.shape[0] > 0
+                ugmdlobs = laygmdlobs.loc[laygmdlobs.icsubno==ibnum,:].copy()
+                assert ugmdlobs.shape[0] > 0
+                ugmdobs = laygmdobs.loc[laygmdobs.icsubno==ibnum,:].copy()
+                assert ugmdobs.shape[0] > 0
                 
-                [ax.plot(ddts,dvals[i,:],"0.5",lw=0.1,alpha=0.3) for i in range(dvals.shape[0])]
-                
-                dvals = pt_en.loc[:,udobs.obsnme].values
-                #dvals[np.abs(dvals)>1e30] = np.nan
-                dvals[dvals==-999] = np.nan
-
-                #ptlowest = np.array([dvals[:i,:].min(axis=0).flatten() for i in range(1,dvals.shape[0])])
-                #ptlowest[np.abs(ptlowest)>1e30]= np.nan
-                ptlowest = []
-                for i in range(dvals.shape[0]):
-                    lowest = []
-                    ddvals = dvals[i,:]
-                    for j in range(1,ddvals.shape[0]):
-                        lowest.append(np.nanmin(ddvals[:j]))
-                    ptlowest.append(np.array(lowest))
-                ptlowest = np.array(ptlowest)
-
-                [ax.plot(ddts,dvals[i,:],pt_color,lw=0.1,alpha=0.3) for i in range(dvals.shape[0])]
-                ax.set_title("delay ib layer {0} gw level".format(uk+1),loc="left")
-                #ax.grid()
-
-                ax = axes[1]
-                [ax.plot(ddts[1:],prlowest[i,:],"0.5",lw=0.1,alpha=0.3) for i in range(prlowest.shape[0])]
-                [ax.plot(ddts[1:],ptlowest[i,:],pt_color,lw=0.1,alpha=0.3) for i in range(ptlowest.shape[0])]
-                ax.set_title("delay ib layer {0} lowest gw level".format(uk+1),loc="left")
-                #ax.grid()
-
-                ax = axes[2]
-                print(hvals.shape,dvals.shape)
-                [ax.plot(ddts,hvals[i,:] - dvals[i,:],pt_color,lw=0.2,alpha=0.4) for i in range(dvals.shape[0])]
-                ax.set_title("gwf minus delay ib gw level layer {0}".format(uk+1),loc="left")
-                #ax.grid()
-
-                ax = axes[3]
-                ptlowest_diff = hvals[:,1:] - ptlowest
-                [ax.plot(ddts[1:],ptlowest_diff[i,:],pt_color,lw=0.2,alpha=0.4) for i in range(ptlowest_diff.shape[0])]
-                ax.set_title(" gwf gw level minus delay ib lowest gw level layer {0}".format(uk+1),loc="left")
-                #ax.grid()
-                if "base" in pt_en.index:
-                    bidx = pt_en.index.tolist().index("base")
-                    critical_results["layer_{0}".format(uk+1)] = pd.Series(ptlowest_diff[bidx,:],index=ddts[1:])
-                    print(node,pt_color,ptlowest_diff[bidx,:])
-                    ax.plot(ddts[1:],ptlowest_diff[bidx,:],pt_color,lw=3.5,alpha=1)
+                unodes = udlobs.node.unique()
+                unodes.sort()
+                pt_color = cmap(norm(iii))
+                for node in unodes:
+                    if node == unodes.min() or node == unodes.max():
+                        continue
+                    ndobs = udobs.loc[udobs.node==node,:].copy()
+                    assert ndobs.shape[0] > 0
+                    ndlobs = udlobs.loc[udlobs.node==node,:].copy()
+                    assert ndlobs.shape[0] > 0
+                    ndlobs.sort_values(by="datetime",inplace=True) 
+                    ngmdlobs = ugmdlobs.loc[ugmdlobs.node==node,:].copy()
+                    assert ngmdlobs.shape[0] > 0
+                    ngmdlobs.sort_values(by="datetime",inplace=True) 
+                    ngmdobs = ugmdobs.loc[ugmdobs.node==node,:].copy()
+                    assert ngmdobs.shape[0] > 0
+                    ngmdobs.sort_values(by="datetime",inplace=True) 
                     
-                mean_critical_results["layer_{0}".format(uk+1)] = pd.Series(ptlowest_diff.mean(axis=0),index=ddts[1:])
-                delay_ib_lowestgw["layer_{0}".format(uk + 1)] = pd.Series(ptlowest.mean(axis=0), index=ddts[1:])
-                gwfminusibgwl = hvals - dvals
-                gwfminusibgwl_df["layer_{0}".format(uk + 1)] = pd.Series(gwfminusibgwl.mean(axis=0), index=ddts)
-           
+                    #print(layer,node,pt_color)
+                    ax = axes[0]
+                    oobs = ndobs
+                    dts = oobs.datetime.values
+                    vals = pr_en.loc[:,oobs.obsnme].values
+                    vals[vals==-999.] = np.nan
+                    [ax.plot(dts,vals[i,:],"0.5",lw=0.05,alpha=0.1) for i in range(vals.shape[0])]
+                    vals = pt_en.loc[:,oobs.obsnme].values
+                    vals[vals==-999.] = np.nan
+                    [ax.plot(dts,vals[i,:],color=pt_color,lw=0.1,alpha=0.1 ,zorder=10) for i in range(vals.shape[0])]
+                    ax.set_title("delay ib level layer {0} (middle node shown for {1} ibs)".format(layer,len(uibnums)),loc="left")
+
+                    ax = axes[1]
+                    oobs = ndlobs
+                    dts = oobs.datetime.values
+                    vals = pr_en.loc[:,oobs.obsnme].values
+                    vals[vals==-999.] = np.nan
+                    [ax.plot(dts,vals[i,:],"0.5",lw=0.05,alpha=0.1) for i in range(vals.shape[0])]
+                    vals = pt_en.loc[:,oobs.obsnme].values
+                    vals[vals==-999.] = np.nan
+                    [ax.plot(dts,vals[i,:],color=pt_color,lw=0.1,alpha=0.1 ,zorder=10) for i in range(vals.shape[0])]
+                    ax.set_title("delay ib lowest level layer {0} (middle node shown for {1} ibs)".format(layer,len(uibnums)),loc="left")
+
+                    ax = axes[2]
+                    oobs = ngmdobs
+                    dts = oobs.datetime.values
+                    vals = pr_en.loc[:,oobs.obsnme].values
+                    vals[vals==-999.] = np.nan
+                    [ax.plot(dts,vals[i,:],"0.5",lw=0.05,alpha=0.1) for i in range(vals.shape[0])]
+                    vals = pt_en.loc[:,oobs.obsnme].values
+                    vals[vals==-999.] = np.nan
+                    [ax.plot(dts,vals[i,:],color=pt_color,lw=0.1,alpha=0.1 ,zorder=10) for i in range(vals.shape[0])]
+                    ax.set_title("gwf minus delay ib level layer {0} (middle node shown for {1} ibs)".format(layer,len(uibnums)),loc="left")
+
+                    ax = axes[3]
+                    oobs = ngmdlobs
+                    dts = oobs.datetime.values
+                    vals = pr_en.loc[:,oobs.obsnme].values
+                    vals[vals==-999.] = np.nan
+                    [ax.plot(dts,vals[i,:],"0.5",lw=0.05,alpha=0.1) for i in range(vals.shape[0])]
+                    vals = pt_en.loc[:,oobs.obsnme].values
+                    vals[vals==-999.] = np.nan
+                    [ax.plot(dts,vals[i,:],color=pt_color,lw=0.1,alpha=0.1 ,zorder=10) for i in range(vals.shape[0])]
+                    ax.set_title("gwf minus delay ib lowest level layer {0} (middle node shown for {1} ibs)".format(layer,len(uibnums)),loc="left")
+
+                    
             for ax in axes:
                 ax.grid()
 
             plt.tight_layout()
             pdf.savefig()
             plt.close(fig)
+       
+
+        for layer in ulayers:
+            
+            laydobs = dobs.loc[dobs.layer==layer,:].copy()
+            assert laydobs.shape[0] > 0
+            laydlobs = dlobs.loc[dlobs.layer==layer,:].copy()
+            assert laydlobs.shape[0] > 0
+            laygmdlobs = gmdlobs.loc[gmdlobs.layer==layer,:].copy()
+            assert laygmdlobs.shape[0] > 0
+            laygmdobs = gmdobs.loc[gmdobs.layer==layer,:].copy()
+            assert laygmdobs.shape[0] > 0
+            uibnums = laydlobs.icsubno.unique()
+            uibnums.sort()
+            print(layer,uibnums)
+            
+            
+            
+            for iii,ibnum in enumerate(uibnums):
+                fig,axes = plt.subplots(4,1,figsize=(11,8.5))
+                udobs = laydobs.loc[laydobs.icsubno==ibnum,:].copy()
+                assert udobs.shape[0] > 0
+                udlobs = laydlobs.loc[laydlobs.icsubno==ibnum,:].copy()
+                assert udlobs.shape[0] > 0
+                ugmdlobs = laygmdlobs.loc[laygmdlobs.icsubno==ibnum,:].copy()
+                assert ugmdlobs.shape[0] > 0
+                ugmdobs = laygmdobs.loc[laygmdobs.icsubno==ibnum,:].copy()
+                assert ugmdobs.shape[0] > 0
+                
+                unodes = udlobs.node.unique()
+                unodes.sort()
+                cmap = plt.get_cmap("jet")
+                norm = matplotlib.colors.Normalize(0,len(unodes)-1)
+                
+                for inode,node in enumerate(unodes):
+                    #if node != unodes.min() and node != unodes.max():
+                    #    continue
+                    pt_color = cmap(norm(inode))
+                    ndobs = udobs.loc[udobs.node==node,:].copy()
+                    assert ndobs.shape[0] > 0
+                    ndlobs = udlobs.loc[udlobs.node==node,:].copy()
+                    assert ndlobs.shape[0] > 0
+                    ndlobs.sort_values(by="datetime",inplace=True) 
+                    ngmdlobs = ugmdlobs.loc[ugmdlobs.node==node,:].copy()
+                    assert ngmdlobs.shape[0] > 0
+                    ngmdlobs.sort_values(by="datetime",inplace=True) 
+                    ngmdobs = ugmdobs.loc[ugmdobs.node==node,:].copy()
+                    assert ngmdobs.shape[0] > 0
+                    ngmdobs.sort_values(by="datetime",inplace=True) 
+                    
+                    print(layer,node,pt_color)
+                    ax = axes[0]
+                    oobs = ndobs
+                    dts = oobs.datetime.values
+                    vals = pr_en.loc[:,oobs.obsnme].values
+                    vals[vals==-999.] = np.nan
+                    [ax.plot(dts,vals[i,:],"0.5",lw=0.05,alpha=0.1) for i in range(vals.shape[0])]
+                    vals = pt_en.loc[:,oobs.obsnme].values
+                    vals[vals==-999.] = np.nan
+                    [ax.plot(dts,vals[i,:],color=pt_color,lw=0.1,alpha=0.1 ,zorder=10) for i in range(vals.shape[0])]
+                    ax.set_title("delay ib level layer {0}, {1} (multiple nodes shown)".format(layer,ibnum),loc="left")
+
+                    ax = axes[1]
+                    oobs = ndlobs
+                    dts = oobs.datetime.values
+                    vals = pr_en.loc[:,oobs.obsnme].values
+                    vals[vals==-999.] = np.nan
+                    [ax.plot(dts,vals[i,:],"0.5",lw=0.05,alpha=0.1) for i in range(vals.shape[0])]
+                    vals = pt_en.loc[:,oobs.obsnme].values
+                    vals[vals==-999.] = np.nan
+                    [ax.plot(dts,vals[i,:],color=pt_color,lw=0.1,alpha=0.1 ,zorder=10) for i in range(vals.shape[0])]
+                    ax.set_title("delay ib lowest level layer {0}, icsubno {1} (multiple nodes shown)".format(layer,ibnum),loc="left")
+
+                    ax = axes[2]
+                    oobs = ngmdobs
+                    dts = oobs.datetime.values
+                    vals = pr_en.loc[:,oobs.obsnme].values
+                    vals[vals==-999.] = np.nan
+                    [ax.plot(dts,vals[i,:],"0.5",lw=0.05,alpha=0.1) for i in range(vals.shape[0])]
+                    vals = pt_en.loc[:,oobs.obsnme].values
+                    vals[vals==-999.] = np.nan
+                    [ax.plot(dts,vals[i,:],color=pt_color,lw=0.1,alpha=0.1 ,zorder=10) for i in range(vals.shape[0])]
+                    ax.set_title("gwf minus delay ib level layer {0}, icsubno {1} (multiple nodes shown)".format(layer,ibnum),loc="left")
+
+                    ax = axes[3]
+                    oobs = ngmdlobs
+                    dts = oobs.datetime.values
+                    vals = pr_en.loc[:,oobs.obsnme].values
+                    vals[vals==-999.] = np.nan
+                    [ax.plot(dts,vals[i,:],"0.5",lw=0.05,alpha=0.1) for i in range(vals.shape[0])]
+                    vals = pt_en.loc[:,oobs.obsnme].values
+                    vals[vals==-999.] = np.nan
+                    [ax.plot(dts,vals[i,:],color=pt_color,lw=0.1,alpha=0.1 ,zorder=10) for i in range(vals.shape[0])]
+                    ax.set_title("gwf minus delay ib lowest level layer {0}, icsubno {1} (multiple nodes number shown)".format(layer,ibnum),loc="left")
+
+                    
+                for ax in axes:
+                    ax.grid()
+
+                plt.tight_layout()
+                pdf.savefig()
+                plt.close(fig)
+
         
-        if len(critical_results) > 0:
-            print(critical_results)
-            df = pd.DataFrame(critical_results)
-            df.index.name = "datetime"
-            df.to_csv(os.path.join(m_d,"critical_results_{0}.csv".format(noptmax)))
-        df = pd.DataFrame(mean_critical_results)
-        df.index.name = "datetime"
-        df.to_csv(os.path.join(m_d,"mean_critical_results_{0}.csv".format(noptmax)))
+        # if len(critical_results) > 0:
+        #     print(critical_results)
+        #     df = pd.DataFrame(critical_results)
+        #     df.index.name = "datetime"
+        #     df.to_csv(os.path.join(m_d,"critical_results_{0}.csv".format(noptmax)))
+        # df = pd.DataFrame(mean_critical_results)
+        # df.index.name = "datetime"
+        # df.to_csv(os.path.join(m_d,"mean_critical_results_{0}.csv".format(noptmax)))
 
-        df = pd.DataFrame(delay_ib_lowestgw)
-        df.index.name = "datetime"
-        df.to_csv(os.path.join(m_d, "mean_delayib_LowestGWL_{0}.csv".format(noptmax)))
+        # df = pd.DataFrame(delay_ib_lowestgw)
+        # df.index.name = "datetime"
+        # df.to_csv(os.path.join(m_d, "mean_delayib_LowestGWL_{0}.csv".format(noptmax)))
 
-        df = pd.DataFrame(gwfminusibgwl_df)
-        df.index.name = "datetime"
-        df.to_csv(os.path.join(m_d, "mean_gwf_minus_ibgwl_{0}.csv".format(noptmax)))
+        # df = pd.DataFrame(gwfminusibgwl_df)
+        # df.index.name = "datetime"
+        # df.to_csv(os.path.join(m_d, "mean_gwf_minus_ibgwl_{0}.csv".format(noptmax)))
 
         usecols = cobs.usecol.unique()
         fig, axes = plt.subplots(len(usecols), 1, figsize=(11,8.5))
@@ -1722,10 +2229,11 @@ def plot_en_compaction(m_d, noptmax=None):
             #vals = pr_en.loc[:,ucobs.obsnme].values
             #[ax.plot(dts, vals[ii,:], color="0.5", lw=0.125, label=usecol, alpha=0.35) for ii in range(vals.shape[0])]
             
-            vals = pt_en.loc[:,ucobs.obsnme].values
+            vals = pt_en.loc[:,ucobs.obsnme].values * 365.25
             [ax.plot(dts, vals[ii,:], color="b", lw=0.125, label=usecol, alpha=0.5) for ii in range(vals.shape[0])]
             ax.set_title(usecol)
             ax.set_xlim(xlim)
+            ax.set_ylabel("$\\frac{ft}{yr}$")
             ax.grid()
             
         mx = -1e30
@@ -1741,34 +2249,35 @@ def plot_en_compaction(m_d, noptmax=None):
         plt.close(fig)
 
 
-        usecols = pobs.usecol.unique()
-        usecols.sort()
-        fig, axes = plt.subplots(len(usecols), 1, figsize=(11,25))
-        for i,usecol in enumerate(usecols):
-            ax = axes[i]
-            ucobs = pobs.loc[pobs.usecol==usecol,:].copy()
-            ucobs.sort_values(by="datetime",inplace=True)
-            dts = ucobs.datetime.values
-            vals = pt_en.loc[:,ucobs.obsnme].values
-            dvals = vals[:,0:-1] - vals[:,1:]
+        # usecols = pobs.usecol.unique()
+        # usecols.sort()
+        
+        # for i,usecol in enumerate(usecols):
+        #     fig, ax = plt.subplots(1, 1, figsize=(11,5))
+        #     #ax = axes[i]
+        #     ucobs = pobs.loc[pobs.usecol==usecol,:].copy()
+        #     ucobs.sort_values(by="datetime",inplace=True)
+        #     dts = ucobs.datetime.values
+        #     vals = pt_en.loc[:,ucobs.obsnme].values
+        #     dvals = vals[:,0:-1] - vals[:,1:]
 
-            #dvals[np.abs(dvals)>1e10] = np.nan
-            #vals[np.abs(vals)>1e10] = np.nan
-            dvals[dvals == -999] = np.nan
-            vals[vals == -999] = np.nan
-            dvals = np.abs(dvals)
-            [ax.plot(dts, vals[ii,:], color='b', lw=0.125, label=usecol, alpha=0.5) for ii in range(vals.shape[0])]
+        #     #dvals[np.abs(dvals)>1e10] = np.nan
+        #     #vals[np.abs(vals)>1e10] = np.nan
+        #     dvals[dvals == -999] = np.nan
+        #     vals[vals == -999] = np.nan
+        #     dvals = np.abs(dvals)
+        #     [ax.plot(dts, vals[ii,:], color='b', lw=0.125, label=usecol, alpha=0.5) for ii in range(vals.shape[0])]
             
-            axt = ax.twinx()
-            [axt.plot(dts[:-1], dvals[ii,:],'k-',alpha=0.5,lw=0.5) for ii in range(dvals.shape[0])]
-            axt.set_ylim(np.nanmax(dvals)*3.0,0)
-            axt.set_ylabel("change in critical stress")
-            ax.set_ylim(ax.get_ylim()[0],ax.get_ylim()[1]*1.5)
-            ax.set_title(usecol,loc="left")
-            ax.grid()
-        plt.tight_layout()
-        pdf.savefig()
-        plt.close(fig)   
+        #     axt = ax.twinx()
+        #     [axt.plot(dts[:-1], dvals[ii,:],'k-',alpha=0.5,lw=0.5) for ii in range(dvals.shape[0])]
+        #     axt.set_ylim(np.nanmax(dvals)*3.0,0)
+        #     axt.set_ylabel("change in critical stress")
+        #     ax.set_ylim(ax.get_ylim()[0],ax.get_ylim()[1]*1.5)
+        #     ax.set_title(usecol,loc="left")
+        #     ax.grid()
+        #     plt.tight_layout()
+        #     pdf.savefig()
+        #     plt.close(fig)   
 
 
 def plot_par_summary(m_d,noptmax=None):
@@ -1892,9 +2401,13 @@ def plot_par_summary(m_d,noptmax=None):
             axes[1].hist(logvals,bins=20,alpha=0.5,facecolor="0.5",density=True)
             
             vals = pt.loc[:,op].values
+            kde = None
+            try:
+                kde = stats.gaussian_kde(vals)
+                yvals = kde(xvals)
+            except Exception as e:
+                kde = None
             
-            kde = stats.gaussian_kde(vals)
-            yvals = kde(xvals)
 
             if vals.min() <= 0 or logtag != "log":
                 logvals = vals
@@ -1907,15 +2420,21 @@ def plot_par_summary(m_d,noptmax=None):
                 logvals = np.log10(vals)
                 loglower = np.log10(lower)
                 logupper = np.log10(upper)
+                try:
+                    kde = stats.gaussian_kde(logvals)
+                    yvalslog = kde(xvalslog) 
+                except Exception as e:
+                    kde = None
                 
-                kde = stats.gaussian_kde(logvals)
-                yvalslog = kde(xvalslog)   
+                  
             
-            axes[0].hist(vals,bins=20,alpha=0.5,facecolor="b",density=True)      
-            axes[0].plot(xvals,yvals,"b-",lw=2.0)
+            axes[0].hist(vals,bins=20,alpha=0.5,facecolor="b",density=True) 
+            #if kde is not None:     
+            #    axes[0].plot(xvals,yvals,"b-",lw=2.0)
 
             axes[1].hist(logvals,bins=20,alpha=0.5,facecolor="b",density=True)      
-            axes[1].plot(xvalslog,yvalslog,"b-",lw=2.0)
+            #if kde is not None:  
+            #    axes[1].plot(xvalslog,yvalslog,"b-",lw=2.0)
             
             axes[0].set_title("par:{0}, transform:{1}".format(op,"none"),loc="left")
             axes[1].set_title("par:{0}, transform:{1}".format(op,logtag),loc="left")
@@ -1944,7 +2463,11 @@ def plot_model_input_summary(m_d,noptmax=None):
     arrobs = arrobs.loc[arrobs.usecol=="pval"]
     arrobs.sort_index(inplace=True)
     listobs = obs.loc[obs.oname=="listobs",:].copy()
+    listobs["layer"] = listobs.layer.astype(int)
+    listobs["icsubno"] = listobs.icsubno.astype(int)
     listobs.sort_index(inplace=True)
+    usecols = listobs.usecol.unique()
+    usecols.sort()
     
     gobs = obs.loc[obs.oname=="ghbhead",:].copy()
     gobs["datetime"] = pd.to_datetime(gobs.datetime)
@@ -1982,6 +2505,86 @@ def plot_model_input_summary(m_d,noptmax=None):
         plt.tight_layout()
         pdf.savefig()
         plt.close(fig)
+
+        for usecol in usecols:
+            uobs = listobs.loc[listobs.usecol==usecol,:].copy()
+            layers = uobs.layer.unique()
+            layers.sort()
+            for layer in layers:
+                layobs = uobs.loc[uobs.layer==layer,:].copy()
+                layobs.sort_values(by="icsubno",inplace=True)
+                norm = matplotlib.colors.Normalize(0,layobs.shape[0]-1)
+                cmap = plt.get_cmap("jet")
+                fig,axes = plt.subplots(2,1,figsize=(7,7))
+                for i,oname in enumerate(layobs.obsnme.values):
+                    # xvals = np.linspace(pr.loc[:,oname].values.min(),pr.loc[:,oname].values.max(),200)
+                    # try:
+                    #     kde = stats.gaussian_kde(pt.loc[:,oname].values)
+                    #     yvals = kde(xvals)
+                    # except:
+                    #     yvals = np.zeros_like(xvals)
+                    #     yvals[:] = np.nan
+                    if min(pr.loc[:,oname].values.min(),pr.loc[:,oname].values.min()) <=0.0:
+                        axes[1].hist(pr.loc[:,oname].values,bins=20,alpha=0.5,facecolor="0.5",density=True)
+                        axes[1].hist(pt.loc[:,oname].values,bins=20,alpha=0.5,facecolor=cmap(norm(i)),density=True)
+                        #axes[1].plot(xvals,yvals,cmap(norm(i)),lw=2.0)
+                        axes[0].set_title("{0} layer: {1}, {2} ibs".format(usecol,layer,len(layobs)),loc="left")
+                        # ylim = axes[1].get_ylim()
+                        # if "base" in pr.index:
+                        #     v = pr._df.loc["base",oname]
+                        #     axes[1].plot([v,v],ylim,"0.5",alpha=0.5,lw=2.0,ls="--",zorder=10)
+                        # if "base" in pt.index:
+                        #     v = pt._df.loc["base",oname]
+                        #     axes[1].plot([v,v],ylim,cmap(norm(i)),alpha=0.5,lw=2.0,ls="--",zorder=10)
+
+                    else:
+                        axes[1].hist(np.log10(pr.loc[:,oname].values),bins=20,alpha=0.5,facecolor="0.5",density=True)
+                        axes[1].hist(np.log10(pt.loc[:,oname].values),bins=20,alpha=0.5,facecolor=cmap(norm(i)),density=True)
+                        #xvalslog = np.linspace(np.log10(pr.loc[:,oname].values.min()),np.log10(pr.loc[:,oname].values.max()),200)
+                        # try:
+                        #     kde = stats.gaussian_kde(np.log10(pt.loc[:,oname].values))
+                        #     yvalslog = kde(xvalslog)
+                        # except:
+                        #     yvalslog = np.zeros_like(xvals)
+                        #     yvalslog[:] = np.nan
+                        #axes[1].plot(xvalslog,yvalslog,cmap(norm(i)),lw=2.0)
+                        axes[1].set_title("{0} layer: {1} (log10), {2} ibs".format(usecol,layer,len(layobs)),loc="left")
+                        # ylim = axes[1].get_ylim()
+                        # if "base" in pr.index:
+                        #     v = np.log10(pr._df.loc["base",oname])
+                        #     axes[1].plot([v,v],ylim,"0.5",alpha=0.5,lw=2.0,ls="--",zorder=10)
+                        # if "base" in pt.index:
+                        #     v = np.log10(pt._df.loc["base",oname])
+                        #     axes[1].plot([v,v],ylim,cmap(norm(i)),alpha=0.5,lw=2.0,ls="--",zorder=10)
+
+                    
+                        
+                
+                    axes[0].hist(pr.loc[:,oname].values,bins=20,alpha=0.5,facecolor="0.5",density=True)
+                    axes[0].hist(pt.loc[:,oname].values,bins=20,alpha=0.5,facecolor=cmap(norm(i)),density=True)
+                    #axes[0].plot(xvals,yvals,"b-",lw=2.0)
+                    # ylim = axes[0].get_ylim()
+                    # if "base" in pr.index:
+                    #     v = pr._df.loc["base",oname]
+                    #     axes[0].plot([v,v],ylim,"0.5",alpha=0.5,lw=2.0,ls="--",zorder=10)
+                    # if "base" in pt.index:
+                    #     v = pt._df.loc["base",oname]
+                    #     axes[0].plot([v,v],ylim,cmap(norm(i)),alpha=0.5,lw=2.0,ls="--",zorder=10)
+
+                axes[0].set_title("{0} layer: {1}, {2} ibs".format(usecol,layer,len(layobs)),loc="left")
+               
+                #ylim = axes[0].get_ylim()
+                #axes[0].plot([lower,lower],ylim,"k--",lw=2)
+                #axes[0].plot([upper,upper],ylim,"k--",lw=2)
+                axes[0].set_yticks([])
+                axes[1].set_yticks([])
+                
+                
+                plt.tight_layout()
+                pdf.savefig()
+                plt.close(fig)
+
+
 
         for oname in listobs.obsnme:
             print("...",oname)
@@ -2071,14 +2674,14 @@ def plot_model_input_summary(m_d,noptmax=None):
                 lower = np.nan
             fig,axes = plt.subplots(2,1,figsize=(7,7))
 
-            xvals = np.linspace(pr.loc[:,oname].values.min(),pr.loc[:,oname].values.max(),200)
-            kde = stats.gaussian_kde(pt.loc[:,oname].values)
-            yvals = kde(xvals)
+            #xvals = np.linspace(pr.loc[:,oname].values.min(),pr.loc[:,oname].values.max(),200)
+            #kde = stats.gaussian_kde(pt.loc[:,oname].values)
+            #yvals = kde(xvals)
 
             if min(pr.loc[:,oname].values.min(),pr.loc[:,oname].values.min(),lower) <=0.0:
                 axes[1].hist(pr.loc[:,oname].values,bins=20,alpha=0.5,facecolor="0.5",density=True)
                 axes[1].hist(pt.loc[:,oname].values,bins=20,alpha=0.5,facecolor="b",density=True)
-                axes[1].plot(xvals,yvals,"b-",lw=2.0)
+                #axes[1].plot(xvals,yvals,"b-",lw=2.0)
                 axes[1].set_title(oname,loc="left")
                 ylim = axes[1].get_ylim()
                 if "base" in pr.index:
@@ -2094,9 +2697,12 @@ def plot_model_input_summary(m_d,noptmax=None):
                 axes[1].hist(np.log10(pr.loc[:,oname].values),bins=20,alpha=0.5,facecolor="0.5",density=True)
                 axes[1].hist(np.log10(pt.loc[:,oname].values),bins=20,alpha=0.5,facecolor="b",density=True)
                 xvalslog = np.linspace(np.log10(pr.loc[:,oname].values.min()),np.log10(pr.loc[:,oname].values.max()),200)
-                kde = stats.gaussian_kde(np.log10(pt.loc[:,oname].values))
-                yvalslog = kde(xvalslog)
-                axes[1].plot(xvalslog,yvalslog,"b-",lw=2.0)
+                try:
+                    kde = stats.gaussian_kde(np.log10(pt.loc[:,oname].values))
+                    yvalslog = kde(xvalslog)
+                    axes[1].plot(xvalslog,yvalslog,"b-",lw=2.0)
+                except Exception as e:
+                    pass
                 axes[1].set_title(oname+" (log10)",loc="left")
                 ylim = axes[1].get_ylim()
                 axes[1].plot([loglower,loglower],ylim,"k--",lw=2)
@@ -2332,7 +2938,9 @@ def plot_all(master_dir,plot_all_iters=False):
     if plot_all_iters:
         plot_phi(m_d=master_dir)
         phidf = pd.read_csv(os.path.join(master_dir,"pest.phi.actual.csv"))
-        iters = [i for i in range(1,phidf.iteration.max()+1)]
+        iters = [i for i in range(1,phidf.iteration.max()+1,3)]
+        if phidf.iteration.max() not in iters:
+            iters.append(phidf.iteration.max())
         make_combined_posterior(master_dir)
         iters.append("combined")
 
@@ -2388,7 +2996,7 @@ def process_diff_obs():
     vals = df["sim-subsidence-ft"].values
     diff,dt1,dt2 = [],[],[]
     for i in range(vals.shape[0]-1):
-        if dts[i].year < 2010:
+        if dts[i].year < 2015:
             continue
         for ii in range(i+1,vals.shape[0]):
             diff.append(vals[ii] - vals[i])
@@ -2737,7 +3345,7 @@ def test_csv_to_ghb(t_d):
     os.chdir(t_d)
     df = csv_to_ghb()
     os.chdir(b_d)
-    return df
+    return df # note cc: df is None because csv_to_ghb() doesn't return df
 
 def csv_to_ghb():
     df = pd.read_csv("input_ghb.csv")
@@ -2750,7 +3358,6 @@ def csv_to_ghb():
     for fname in fnames:
         fdf = df.loc[df.fname==fname,:]
         fdf.loc[:,["lay","row","col","bhead","cond"]].to_csv(fname,sep=" ",header=False,index=False)
-
 
 def run_scenarios(location,t_d,m_d,post_itr=None,new_m_d=None,
                   new_t_d=None,num_workers=10,port=4003,
@@ -2796,6 +3403,7 @@ def run_scenarios(location,t_d,m_d,post_itr=None,new_m_d=None,
     par = pst.parameter_data
 
     print("mapping scenarios into parameter data...")
+    # ghb heads: one direct grid par/stress period/layer
     dpar = par.loc[par.pname == "directghbhead", :].copy()
     assert (dpar.shape[0] > 0)
     dpar["datetime"] = pd.to_datetime(dpar.datetime)
@@ -2820,14 +3428,21 @@ def run_scenarios(location,t_d,m_d,post_itr=None,new_m_d=None,
             assert ssscen_df.shape[0] == len(dtset)
             assert ssscen_df.shape[1] >= 1
             sname = ssscen_df.columns[0]
+            # loop through pars and their datetimes:
             for pname,dt in zip(dkpar.parnme,dkpar.datetime):
+                # if dt is earlier than the scenario start datetime, skip
                 if dt < scenario_start_datetime:
                     continue
+                # if dt exists in the list of scenario datetimes, assign the exact value
+                # from ssscen_df, otherwise interpolate using the nearest datetime in scen_df:
                 if dt not in dtset:
                     print("missing",dt,"interpolating...")
+                    # abs difference in days between df and all datetime indices in scen_df
                     scen_df["dtdiff"] = np.abs((scen_df.index - dt).days)
+                    # find the index of the closest datetime in scen_df to the missing dt
                     nearest = scen_df.dtdiff.idxmin()
                     print("...interpolated from ",dt," to ",nearest)
+                    # assign the interpolated value from scen_df at the nearest datetime
                     dpar.loc[pname, name] = ssscen_df.loc[nearest, sname]
 
                 else:
@@ -2863,11 +3478,12 @@ def run_scenarios(location,t_d,m_d,post_itr=None,new_m_d=None,
     #combo_pe = pd.concat([combo_pe,t])
     combo_pe = t.copy()
     t = None
-    t = pr_pe._df.copy()
 
+    t = pr_pe._df.copy()
     t.index = ["bayes:pr_real:{0}_scen:base".format(i) for i in pr_pe.index]
     combo_pe_pr = t.copy()
     t = None
+
     scen_ens = [combo_pe.copy()]
     scen_ens_pr = [combo_pe_pr.copy()]
     for sname in scenario_names:
@@ -3549,6 +4165,7 @@ def plot_WL_SUB_2_panel(m_d,
                                                                                          ls='-',
                                                                                          label=f'GWL - {lith_dict[c].capitalize()}  Aquifer (ft)')
 
+
                 # # Plot obs subsidence --> spirit leveling
                 sub_observed['Subsidence_ft'] = sub_observed['Subsidence_ft'].astype(float)
                 sub_observed = sub_observed.dropna()
@@ -3642,6 +4259,64 @@ def plot_WL_SUB_2_panel(m_d,
                             bbox_inches='tight')
 
                 plt.close(fig)
+
+    # Figure formatting
+    site_name = os.path.normpath(m_d).split(os.path.sep)[0]
+    fig.suptitle(f'{site_name}', y=0.91, fontsize=13)
+    
+    h1, l1 = ax[0].get_legend_handles_labels()
+    h2, l2 = ax2.get_legend_handles_labels()
+    ax[0].legend(handles=h1[:2] + h2[:2],
+                 labels=l1[:2] + l2[:2],
+                 loc=3,
+                 framealpha=0.8,
+                 fontsize=10)
+    
+    ax[0].tick_params(direction='in', which='both', length=10)
+    ax2.tick_params(direction='in', which='both', length=10)
+    ax[0].tick_params(axis='x',
+                      which='both',
+                      bottom=False,
+                      labelbottom=False)
+    ax[0].tick_params(axis='y',
+                      colors='maroon')
+    
+    ax[0].yaxis.label.set_color('maroon')
+    ax2.tick_params(axis='y',
+                    colors='royalblue')
+    ax2.yaxis.label.set_color('royalblue')
+    
+    ax[0].set_ylabel('Land-surface\nsubsidence in feet', fontsize=12)
+    ax[0].set_xlim(ax[1].get_xlim())
+    ax2.set_ylabel('Water level altitude\nin feet above NAD88', fontsize=12)
+    # Explicitly set label position
+    ax2.yaxis.set_label_position("right")
+    ax[0].set_ylim([ax[0].get_ylim()[1],
+                    ax[0].get_ylim()[0]])
+
+    ax[1].axhline(0, color='darkslategrey')
+    ax[1].yaxis.label.set_color('royalblue')
+    ax[1].set_ylabel(f'{aquifer_keys[1]} aquifer water\nlevel minus critical head', fontsize=12)
+    
+    ax[1].tick_params(direction='in', 
+                      which='both', 
+                      length=10)
+    ax[1].tick_params(labelbottom=True, 
+                      labelleft=True)
+    
+    ax[0].tick_params(axis='y', labelsize=10)
+    ax2.tick_params(axis='y', labelsize=10)
+    ax[1].tick_params(axis='x', labelsize=10)
+    ax[1].tick_params(axis='y', labelsize=10)
+    
+    savePath = os.path.join(m_d, "figures")
+    os.makedirs(savePath, exist_ok=True)
+    
+    plt.savefig(os.path.join(savePath, f"{site_name}_WL_SUB_{aquifer_keys[1]}_{noptmax}.png"),
+                dpi=250,
+                bbox_inches='tight')
+    
+    plt.close(fig)
 
 
 def export_realizations_to_dirs(t_d,m_d,real_name_tag="base",noptmax=None,just_mf6=True,
@@ -3970,6 +4645,352 @@ def plot_morris_delaydif_summary(m_d,npar_results=10):
 
 
 
+def plot_morris_delaydif_summary2(ies_m_d,morris_m_d,noptmax=None,npar_results=15):
+
+
+    pst = pyemu.Pst(os.path.join(ies_m_d,"pest.pst"))
+    if noptmax is None:
+        phidf = pd.read_csv(os.path.join(ies_m_d,"pest.phi.actual.csv"))
+        noptmax = phidf.iteration.max()
+
+    oe = pyemu.ObservationEnsemble.from_binary(pst=None,filename=os.path.join(ies_m_d,"pest.{0}.obs.jcb".format(noptmax)))
+
+    obs = pst.observation_data
+    par = pst.parameter_data
+
+    hdobs = obs.loc[obs.usecol.str.startswith("hd."),:].copy()
+    assert hdobs.shape[0] > 0
+    hdobs["datetime"] = pd.to_datetime(hdobs.datetime)
+    hdobs["k"] = hdobs.usecol.apply(lambda x: int(x.split(".")[1]))
+
+    subobs = obs.loc[obs.usecol.str.startswith("sim-subsidence-ft"),:].copy()
+    assert subobs.shape[0] > 0
+    subobs["datetime"] = pd.to_datetime(subobs.datetime)
+    subobs.sort_values(by="datetime",inplace=True)
+    
+    comobs = obs.loc[obs.usecol.str.startswith("compaction."),:].copy()
+    assert comobs.shape[0] > 0
+    comobs["datetime"] = pd.to_datetime(comobs.datetime)
+    comobs["k"] = comobs.usecol.apply(lambda x: int(x.split(".")[1]))
+
+    lowobs = obs.loc[obs.usecol.str.startswith("delaylowest."),:].copy()
+    assert lowobs.shape[0] > 0
+    lowobs["datetime"] = pd.to_datetime(lowobs.datetime)
+    lowobs["k"] = lowobs.usecol.apply(lambda x: int(x.split(".")[1]))
+
+    dobs = obs.loc[obs.usecol.str.startswith("delay-head."),:].copy()
+    assert dobs.shape[0] > 0
+    dobs["datetime"] = pd.to_datetime(dobs.datetime)
+    dobs["k"] = dobs.usecol.apply(lambda x: int(x.split(".")[1].split(".")[0]))
+    
+    sdobs2 = obs.loc[obs.usecol.str.startswith("gwf-minus-delay."),:].copy()
+    assert sdobs2.shape[0] > 0
+    sdobs2["datetime"] = pd.to_datetime(sdobs2.datetime)
+    sdobs2["k"] = sdobs2.usecol.apply(lambda x: int(x.split(".")[1]))
+
+    sdobs = obs.loc[obs.usecol.str.startswith("gwf-minus-delaylowest."),:].copy()
+    assert sdobs.shape[0] > 0
+    sdobs["datetime"] = pd.to_datetime(sdobs.datetime)
+    sdobs["k"] = sdobs.usecol.apply(lambda x: int(x.split(".")[1]))
+    
+    uk = sdobs.k.unique()
+    uk.sort()
+
+    df = pd.read_csv(os.path.join(morris_m_d,"pest.mio"))
+    abssendf = df.pivot(index="observation_name",columns="parameter_name",values="sen_mean_abs")
+    stdsendf = df.pivot(index="observation_name",columns="parameter_name",values="sen_std_dev")
+    abssendf.sort_index(inplace=True,axis=1)
+    stdsendf.sort_index(inplace=True,axis=1)
+    print(abssendf.max())
+    nabssendf = abssendf / abssendf.max()
+    # vals = nabssendf.values
+    # vals[np.abs(vals)<1e-10] = np.nan
+    # vals = abssendf.values
+    # vals[np.abs(vals)<1e-10] = np.nan
+    # vals = stdsendf.values
+    # vals[np.abs(vals)<1e-10] = np.nan
+
+
+    def namer(name):
+        k = None
+        if "k:" in name:
+            k = int(name.split("k:")[1].split("_")[0])
+            if "usecol" in name:
+                k += 1
+        if "usecol" in name:
+            
+            raw = name.split("usecol:")[1].split("_")
+            nname = ''
+            for r in raw:
+                if ":" in r:
+                    break
+                nname += r + " "
+                
+            #name.split("usecol:")[1].split("_")
+            
+        else:
+            nname = name.split("pname:")[1].split("_")[0]
+        if k is not None:
+               nname += "layer {0}".format(k+1)
+        print(name,nname)
+        return nname 
+
+    fig,axes = plt.subplots(3,1,figsize=(10,10))
+        
+    ax = axes[0]
+    vals = oe.loc[:,subobs.obsnme].values
+    vals[vals==-999] = np.nan
+    dts = subobs.datetime.values
+    [ax.plot(dts,vals[i,:],"b",lw=0.3,alpha=0.2) for i in range(vals.shape[0])]
+    ax.set_title("subsidence",loc="left")
+
+    ax = axes[1]
+    vals = abssendf.loc[subobs.obsnme,:]
+    vsum = vals.max()
+    vsum.sort_values(inplace=True,ascending=False)
+    #print(vsum)
+    #exit()
+    keep = vsum.iloc[:npar_results].index.values
+    #keep.sort()
+    vals = vals.loc[:,keep].values.transpose()
+    X,Y = np.meshgrid(dts,np.arange(len(keep)))
+    #print(X.shape,Y.shape,vals)
+    ax.pcolormesh(X,Y,vals)
+    ax.set_yticks(np.arange(len(keep)))
+    ax.set_yticklabels([namer(ke) for ke in keep])
+    ax.set_title("absolute mean sensitivity",loc="left")
+
+    ax = axes[2]
+    vals = stdsendf.loc[subobs.obsnme,:]
+    vsum = vals.sum()
+    vsum.sort_values(inplace=True,ascending=False)
+    keep = vsum.iloc[:npar_results].index.values
+    #keep.sort()
+    vals = vals.loc[:,keep].values.transpose()
+    X,Y = np.meshgrid(dts,np.arange(len(keep)))
+    #print(X.shape,Y.shape,vals)
+    ax.pcolormesh(X,Y,vals)
+    ax.set_yticks(np.arange(len(keep)))
+    ax.set_yticklabels([namer(ke) for ke in keep])
+    ax.set_title("sensitivity standard deviation",loc="left")
+
+    xlim = axes[1].get_xlim()
+    axes[0].set_xlim(xlim)
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(morris_m_d,"morris_subsidence_summary.pdf"))
+    plt.close(fig)
+
+
+        
+    for k in uk:
+
+        sdkobs = sdobs.loc[sdobs.k==k,:].copy()
+        sdkobs.sort_values(by="datetime",inplace=True)
+
+        dkobs = dobs.loc[dobs.k==k,:].copy()
+        dkobs.sort_values(by="datetime",inplace=True)
+        
+        sdkobs2 = sdobs2.loc[sdobs2.k==k,:].copy()
+        sdkobs2.sort_values(by="datetime",inplace=True)
+        
+
+        lowkobs = lowobs.loc[lowobs.k==k,:].copy()
+        assert lowkobs.shape[0] > 0
+        lowkobs.sort_values(by="datetime",inplace=True) 
+        
+        comkobs = comobs.loc[comobs.k==k,:].copy()
+        assert comkobs.shape[0] > 0
+        comkobs.sort_values(by="datetime",inplace=True)
+
+        hdkobs = hdobs.loc[hdobs.k==k,:].copy()
+        assert hdkobs.shape[0] > 0
+        hdkobs.sort_values(by="datetime",inplace=True)
+
+        fig,axes = plt.subplots(3,1,figsize=(10,10))
+        ax =axes[0]
+        dts = hdkobs.datetime.values
+        hvals = oe.loc[:,hdkobs.obsnme].values
+        hvals[hvals==-999] = np.nan
+        [ax.plot(dts,hvals[i,:],'b',lw=0.1,alpha=0.2) for i in range(vals.shape[0])]
+        dvals = oe.loc[:,dkobs.obsnme].values
+        dvals[dvals==-999] = np.nan
+        [ax.plot(dts,dvals[i,:],'m',lw=0.1,alpha=0.2) for i in range(vals.shape[0])]
+
+        ax = axes[1]
+        vals = oe.loc[:,sdkobs2.obsnme].values
+        vals[vals==-999] = np.nan
+        [ax.plot(dts,vals[i,:],'b',lw=0.1,alpha=0.2) for i in range(vals.shape[0])]
+
+        ax = axes[2]
+        [ax.plot(dts,hvals[i,:] - dvals[i,:],'b',lw=0.1,alpha=0.2) for i in range(vals.shape[0])]
+
+        plt.tight_layout()
+        plt.savefig("invest.pdf")
+        plt.close()
+
+
+        fig,axes = plt.subplots(3,1,figsize=(10,10))
+        ax =axes[0]
+        dts = hdkobs.datetime.values
+        hvals = oe.loc[:,hdkobs.obsnme].values
+        hvals[hvals==-999] = np.nan
+        [ax.plot(dts,hvals[i,:],'b',lw=0.1,alpha=0.2) for i in range(vals.shape[0])]
+        dvals = oe.loc[:,lowkobs.obsnme].values
+        dvals[dvals==-999] = np.nan
+        [ax.plot(dts,dvals[i,:],'m',lw=0.1,alpha=0.2) for i in range(vals.shape[0])]
+
+        ax = axes[1]
+        vals = oe.loc[:,sdkobs.obsnme].values
+        vals[vals==-999] = np.nan
+        [ax.plot(dts,vals[i,:],'b',lw=0.1,alpha=0.2) for i in range(vals.shape[0])]
+
+        ax = axes[2]
+        [ax.plot(dts,hvals[i,:] - dvals[i,:],'b',lw=0.1,alpha=0.2) for i in range(vals.shape[0])]
+
+        plt.tight_layout()
+        plt.savefig("invest2.pdf")
+        plt.close()
+
+
+
+        fig,axes = plt.subplots(3,1,figsize=(10,10))
+        
+        ax = axes[0]
+        vals = oe.loc[:,comkobs.obsnme].values
+        vals[vals==-999] = np.nan
+        dts = comkobs.datetime.values
+        [ax.plot(dts,vals[i,:],"b",lw=0.3,alpha=0.2) for i in range(vals.shape[0])]
+        ax.set_title("layer {0} compaction".format(k),loc="left")
+
+        ax = axes[1]
+        vals = abssendf.loc[comkobs.obsnme,:]
+        vsum = vals.max()
+        vsum.sort_values(inplace=True,ascending=False)
+        #print(vsum)
+        #exit()
+        keep = vsum.iloc[:npar_results].index.values
+        #keep.sort()
+        vals = vals.loc[:,keep].values.transpose()
+        X,Y = np.meshgrid(dts,np.arange(len(keep)))
+        #print(X.shape,Y.shape,vals)
+        ax.pcolormesh(X,Y,vals)
+        ax.set_yticks(np.arange(len(keep)))
+        ax.set_yticklabels([namer(ke) for ke in keep])
+        ax.set_title("absolute mean sensitivity",loc="left")
+
+        ax = axes[2]
+        vals = stdsendf.loc[comkobs.obsnme,:]
+        vsum = vals.sum()
+        vsum.sort_values(inplace=True,ascending=False)
+        keep = vsum.iloc[:npar_results].index.values
+        #keep.sort()
+        vals = vals.loc[:,keep].values.transpose()
+        X,Y = np.meshgrid(dts,np.arange(len(keep)))
+        #print(X.shape,Y.shape,vals)
+        ax.pcolormesh(X,Y,vals)
+        ax.set_yticks(np.arange(len(keep)))
+        ax.set_yticklabels([namer(ke) for ke in keep])
+        ax.set_title("sensitivity standard deviation",loc="left")
+
+        xlim = axes[1].get_xlim()
+        axes[0].set_xlim(xlim)
+
+        plt.tight_layout()
+        plt.savefig(os.path.join(morris_m_d,"morris_compaction_summary_layer{0}.pdf".format(k)))
+        plt.close(fig)
+
+
+        fig,axes = plt.subplots(3,1,figsize=(10,10))
+        
+        ax = axes[0]
+        vals = oe.loc[:,lowkobs.obsnme].values
+        vals[vals==-999] = np.nan
+        dts = lowkobs.datetime.values
+        [ax.plot(dts,vals[i,:],"b",lw=0.3,alpha=0.2) for i in range(vals.shape[0])]
+        ax.set_title("layer {0} interbed lowest yet".format(k),loc="left")
+
+        ax = axes[1]
+        vals = abssendf.loc[lowkobs.obsnme,:]
+        vsum = vals.sum()
+        vsum.sort_values(inplace=True,ascending=False)
+        keep = vsum.iloc[:npar_results].index.values
+        #keep.sort()
+        vals = vals.loc[:,keep].values.transpose()
+        X,Y = np.meshgrid(dts,np.arange(len(keep)))
+        #print(X.shape,Y.shape,vals)
+        ax.pcolormesh(X,Y,vals)
+        ax.set_yticks(np.arange(len(keep)))
+        ax.set_yticklabels([namer(ke) for ke in keep])
+        ax.set_title("absolute mean sensitivity",loc="left")
+
+        ax = axes[2]
+        vals = stdsendf.loc[lowkobs.obsnme,:]
+        vsum = vals.sum()
+        vsum.sort_values(inplace=True,ascending=False)
+        keep = vsum.iloc[:npar_results].index.values
+        keep.sort()
+        vals = vals.loc[:,keep].values.transpose()
+        X,Y = np.meshgrid(dts,np.arange(len(keep)))
+        #print(X.shape,Y.shape,vals)
+        ax.pcolormesh(X,Y,vals)
+        ax.set_yticks(np.arange(len(keep)))
+        ax.set_yticklabels([namer(ke) for ke in keep])
+        ax.set_title("sensitivity standard deviation",loc="left")
+
+        xlim = axes[1].get_xlim()
+        axes[0].set_xlim(xlim)
+
+        plt.tight_layout()
+        plt.savefig(os.path.join(morris_m_d,"morris_lowest_summary_layer{0}.pdf".format(k)))
+        plt.close(fig)
+
+        fig,axes = plt.subplots(3,1,figsize=(10,10))
+        
+        ax = axes[0]
+        vals = oe.loc[:,sdkobs.obsnme].values
+        vals[vals==-999] = np.nan
+        dts = sdkobs.datetime.values
+        [ax.plot(dts,vals[i,:],"b",lw=0.3,alpha=0.2) for i in range(vals.shape[0])]
+        ax.set_title("layer {0} interbed gwf minus lowest yet".format(k),loc="left")
+
+        ax = axes[1]
+        vals = abssendf.loc[sdkobs.obsnme,:]
+        vsum = vals.sum()
+        vsum.sort_values(inplace=True,ascending=False)
+        keep = vsum.iloc[:npar_results].index.values
+        #keep.sort()
+        vals = vals.loc[:,keep].values.transpose()
+        X,Y = np.meshgrid(dts,np.arange(len(keep)))
+        print(X.shape,Y.shape,vals)
+        ax.pcolormesh(X,Y,vals)
+        ax.set_yticks(np.arange(len(keep)))
+        ax.set_yticklabels([namer(ke) for ke in keep])
+        ax.set_title("absolute mean sensitivity",loc="left")
+
+        ax = axes[2]
+        vals = stdsendf.loc[sdkobs.obsnme,:]
+        vsum = vals.sum()
+        vsum.sort_values(inplace=True,ascending=False)
+        keep = vsum.iloc[:npar_results].index.values
+        #keep.sort()
+        vals = vals.loc[:,keep].values.transpose()
+        X,Y = np.meshgrid(dts,np.arange(len(keep)))
+        print(X.shape,Y.shape,vals)
+        ax.pcolormesh(X,Y,vals)
+        ax.set_yticks(np.arange(len(keep)))
+        ax.set_yticklabels([namer(ke) for ke in keep])
+        ax.set_title("sensitivity standard deviation",loc="left")
+
+        xlim = axes[1].get_xlim()
+        axes[0].set_xlim(xlim)
+
+        plt.tight_layout()
+        plt.savefig(os.path.join(morris_m_d,"morris_gwf_minus_lowest_summary_layer{0}.pdf".format(k)))
+
+
+
+        
 
 def plot_morris(m_d,npar_results=10):
     pst = pyemu.Pst(os.path.join(m_d,"pest.pst"))
@@ -4199,8 +5220,8 @@ def make_combined_posterior(m_d):
         pe = pyemu.ParameterEnsemble.from_binary(pst=pst,filename=os.path.join(m_d,"pest.{0}.par.jcb".format(itr)))
         oe = pyemu.ObservationEnsemble.from_binary(pst=pst,filename=os.path.join(m_d,"pest.{0}.obs.jcb".format(itr)))
         if itr == 0:
-            pr_pv = oe.phi_vector
-            prior_nreal = pe.shape[0]
+            pr_pv = oe.phi_vector # prior phi values
+            prior_nreal = pe.shape[0] # number of prior reals
             
         pe = pe._df
         oe = oe._df
@@ -4214,16 +5235,20 @@ def make_combined_posterior(m_d):
         pyemu.ObservationEnsemble(df=oes[0],pst=pst).to_binary(os.path.join(m_d,"pest.combined.obs.jcb"))
         return
     
-
+    # concatenate eos and pes from all iterations
     oe = pd.concat(oes)
     pe = pd.concat(pes)
 
+    # calculate phi values of the concatenated oe
     oe = pyemu.ObservationEnsemble(df=oe,pst=pst)
     pv = oe.phi_vector
+    # keep the first [prior_nreal] reals with the lowest phi values
     pv.sort_values(inplace=True)
     pv = pv.iloc[:prior_nreal]
 
+    # identify the base reals across all iterations
     base_idxs = oe.loc[oe.index.map(lambda x: "realbase" in x),:].index.values
+    # identify at which iteration the base real has the lowest phi value
     base_pv = oe.loc[base_idxs,:].phi_vector
     min_base_real = None
     if base_pv.shape[0] > 0:
@@ -4536,6 +5561,8 @@ def plot_compare_sub(m_ds, noptmax=None):
 
         
 def xfer_from_m_d(tpl_dir,xfer_m_d,xfer_noptmax=None):
+
+    # load pst and pe from master dir (xfer_m_d)
     xpst = pyemu.Pst(os.path.join(xfer_m_d,"pest.pst"))
     if xfer_noptmax is None:
         #make_combined_posterior(xfer_m_d)
@@ -4553,12 +5580,16 @@ def xfer_from_m_d(tpl_dir,xfer_m_d,xfer_noptmax=None):
     pst = pyemu.Pst(os.path.join(tpl_dir,"pest.pst"),parse_metadata=False)
     pe = pyemu.ParameterEnsemble.from_binary(pst=pst,filename=os.path.join(tpl_dir,"prior_pe.jcb"))._df
     par = pst.parameter_data
-    
+
+    # if there are more reals in pe (tpl_dir) than in xpe (xfer_m_d), truncate pe (to match the number of reals in xpe)
     if pe.shape[0] > xpe.shape[0]:
-        pe = pe.iloc[:xpe.shape[0],:]   
+        pe = pe.iloc[:xpe.shape[0],:]
+    # if there are less reals in pe (tpl_dir) than in the xpe (xfer_m_d), drop reals from xpe
     elif pe.shape[0] < xpe.shape[0]:
         drop_real = [idx for idx in xpe.index if idx != "base"][-1]
+        # drop_real = [idx for idx in xpe.index if "base" not in idx][-1] # todo cc check with JW should be this? since idxs = 'real[i]_itr[j]'
         xpe.drop(drop_real,inplace=True)
+    # if base real is missing from pe (tpl_dir), create base real from parval1s
     if "base" not in pe.index and "base" in xpe.index:
         pe = pe.iloc[:-1,:]
         pe.loc["base",:] = pst.parameter_data.parval1.loc[pe.columns]
@@ -4566,11 +5597,13 @@ def xfer_from_m_d(tpl_dir,xfer_m_d,xfer_noptmax=None):
 
     xpar = xpst.parameter_data
     par = pst.parameter_data
+
+    # prop parameters = csub pars + consthead par (exclude additive grid ghbhead pars, + direct grid directghbhead pars if exist)
     xproppar = xpar.loc[~xpar.parnme.str.contains("ghb"),:]
     #xproppar = xproppar.loc[~xproppar.parnme.str.contains("consthead"),:]
     proppar = par.loc[~par.parnme.str.contains("ghb"),:]
     #proppar = proppar.loc[~proppar.parnme.str.contains("consthead"),:]
-    
+
     assert xproppar.shape[0] > 0
     assert proppar.shape[0] > 0
     missing = set(proppar.parnme.tolist()).symmetric_difference(set(xproppar.parnme.tolist()))
@@ -4579,10 +5612,13 @@ def xfer_from_m_d(tpl_dir,xfer_m_d,xfer_noptmax=None):
     #assert xproppar.shape[0] == proppar.shape[0]    
     #print(pe.shape,pst.npar,pst.npar_adj)
 
+    missingpe = set([s for s in pe.columns if "ghb" not in s]).symmetric_difference(set([s for s in xpe.columns if "ghb" not in s]))
+    print(missingpe) # todo cc check with JW. # len(par) > len(xpar)
+
     pe.index = xpe.index.values
     #print(pe.index)
 
-    pe.loc[:,xproppar.parnme.values] = xpe.loc[:,xproppar.parnme.values].values
+    pe.loc[:,xproppar.parnme.values] = xpe.loc[:,xproppar.parnme.values].values  # todo cc check with JW. after this line pe has 8 new columns
     pe = pyemu.ParameterEnsemble(df=pe,pst=None)
     #pe = pe.loc[:,pst.adj_par_names]
     pe.to_binary(os.path.join(tpl_dir,"xfer.jcb"))
@@ -5040,9 +6076,11 @@ def process_compaction_tdiff_obs(t_d="."):
     sdf = pd.read_csv(os.path.join(t_d,"datetime_model.csub.obs.csv"),index_col=0,parse_dates=True)
     sdf = sdf.loc[:,[c for c in sdf.columns if c.startswith("compaction.")]]    
     tdiffs = {}
+    demon = (sdf.index[1:] - sdf.index[:-1]).days
     for col in sdf.columns:
         vals = sdf.loc[:,col].values
-        diff = vals[1:] - vals[:-1]
+
+        diff = (vals[1:] - vals[:-1]) / demon
         tdiffs["tdif-"+col] = diff
 
     difdf = pd.DataFrame(tdiffs,index=sdf.index[1:])
@@ -5070,7 +6108,7 @@ def process_compaction_at_above_obs(t_d="."):
 def process_delay_obs(t_d="."):
     sdf = pd.read_csv(os.path.join(t_d,"datetime_model.csub.obs.csv"),index_col=0,parse_dates=True)
     gdf = pd.read_csv(os.path.join(t_d,"datetime_model.gwf.obs.csv"),index_col=0,parse_dates=True)    
-    ddf = sdf.loc[:,sdf.columns.str.contains("delay-head")]
+    ddf = sdf.loc[:,sdf.columns.str.contains("delay-head.")]
     vals = ddf.values
     vals[vals==-999.0] = np.nan
     lowest = []
@@ -5080,11 +6118,23 @@ def process_delay_obs(t_d="."):
     ddf_layers = [c.split(".")[1] for c in ddf.columns]
     diffs = {}
     for col in ddf.columns:
-        layer = col.split(".")[1]
-        gcol = [c for c in gdf.columns if c.endswith(".{0}".format(layer))]
-        assert len(gcol) == 1,str(gdf.columns)
-        diffs["gwf-minus-delay.{0}".format(layer)] = gdf.loc[:,gcol].values.flatten() - ddf.loc[:,col].values.flatten()
-        diffs["gwf-minus-delaylowest.{0}".format(layer)] = gdf.loc[:,gcol].values.flatten() - lowest.loc[:,col].values.flatten()    
+        layer = int(col.split(".")[1])#.split(".")[0]
+        icsubno = int(col.split(".")[2])
+        node = int(col.split(".")[3])
+        gcol = [c for c in gdf.columns if c.endswith(".{0:02d}".format(layer))]
+        assert len(gcol) == 1,str(layer)+"..."+str(gcol)+"..."+str(gdf.columns)
+        diffs["gwf-minus-delay.{0}.{1}.{2}".format(layer,icsubno,node)] = (gdf.loc[:,gcol].values.flatten() - ddf.loc[:,col].values.flatten()).copy()
+
+        g_m_dl = gdf.loc[:,gcol].values.flatten().copy() - lowest.loc[:,col].values.flatten().copy()
+        #gdf.loc[:,gcol].plot()
+        #lowest.loc[:,col].plot()
+        #ddf.loc[:,col].plot()
+        #print(g_m_dl)
+        diffs["gwf-minus-delaylowest.{0}.{1}.{2}".format(layer,icsubno,node)] = g_m_dl.copy()   
+        diffs["delaylowest.{0}.{1}.{2}".format(layer,icsubno,node)] = lowest.loc[:,col].values.flatten().copy()   
+        g_m_dl[g_m_dl>0] = 0
+        sum_g_m_dl = np.cumsum(g_m_dl)
+        diffs["csum-gwf-minus-delaylowest.{0}.{1}.{2}".format(layer,icsubno,node)] = sum_g_m_dl
     
     difdf = pd.DataFrame(diffs,index=gdf.index)
     difdf.fillna(-999.0,inplace=True)
@@ -5211,10 +6261,83 @@ def process_percent_comp_obs(t_d="."):
     return df
 
 
+def process_strain(template_ws="."):
+    df = pd.read_csv(os.path.join(template_ws,"model.strainib.csv"))
+    df.columns = df.columns.map(str.strip).map(str.lower).map(lambda x: x.replace("_","-"))
+    df.to_csv(os.path.join(template_ws,"model.strainib.csv"),index=False)
+    return df
+    
+
+
+def repair_thickfrac(t_d="."):
+    top = np.loadtxt(os.path.join(t_d,"model.dis_top.txt"))
+    bfiles = [f for f in os.listdir(t_d) if f.startswith("model.dis_botm_")]
+    bfiles.sort()
+    bdict = {}
+    for bfile in bfiles:
+        lay = int(bfile.split("_layer")[1].split(".")[0])
+        bdict[lay] = np.loadtxt(os.path.join(t_d,bfile))
+    layers = list(bdict.keys())
+    tdict = {}
+    for k,lay in enumerate(layers):
+        if k == 0:
+            tdict[lay] = top - bdict[lay]
+        else:
+            tdict[lay] = bdict[lay-1] - bdict[lay]
+
+
+    cdf = pd.read_csv(os.path.join(t_d,"model.csub_packagedata.txt"),header=None,sep="\s+")
+    
+    # make sure rnb >= 1
+    #cdf.loc[cdf[7]<1,7] = 1
+    
+    #print(cdf)
+    #print(layers)
+    for lay in layers:
+        laydf = cdf.loc[cdf[1]==lay].copy()
+        thickfrac = laydf[6]
+        rnb = laydf[7]
+        claythick = (thickfrac*rnb).sum()
+        aqthick = tdict[lay]
+        ratio = aqthick/claythick
+        print(lay,ratio)
+        if ratio <1.00:
+            laydf[6] *= ratio*.99
+            cdf.loc[laydf.index,6] = laydf[6]
+            laydf = cdf.loc[cdf[1]==lay]
+            thickfrac = laydf[6]
+            rnb = laydf[7]
+            claythick = (thickfrac*rnb).sum()
+            aqthick = tdict[lay]
+            ratio = aqthick/claythick
+            print(lay,ratio)
+
+    cdf.to_csv(os.path.join(t_d,"model.csub_packagedata.txt"),header=False,index=False,sep=" ")
+        
+
 if __name__ == "__main__":
-    t_d = os.path.join("PORT","template_ies_delay_y_nofocus_nospecstate_thickcontrol4")
-    process_compaction_at_above_obs(t_d)
+
+    master_dir = os.path.join("T949R","master_ies_delay_y_focus_specstate_lessrbnd_stressbasedmibs_nocsubtie")
+    pst = pyemu.Pst(os.path.join(master_dir,"pest.pst"),result_dir=master_dir)
+    plot_model_input_summary(m_d=master_dir,noptmax=pst.ies.phiactual.iteration.max())
+    plot_en_compaction(m_d=master_dir,noptmax=pst.ies.phiactual.iteration.max())
+    #plot_all(master_dir,plot_all_iters=True)
+    #process_compaction_tdiff_obs(t_d=os.path.join("D454","template_ies_delay_y_nofocus_specstate_stressbasedclay5"))
+    #repair_thickfrac(os.path.join("D454","template_ies_delay_y_nofocus_specstate_stressbasedclay5"))
     exit()
+
+    ies_m_d = os.path.join("D454","master_ies_delay_y_nofocus_specstate_stressbasedmorris")
+    morris_m_d = os.path.join("D454","master_ies_delay_y_nofocus_specstate_stressbasedmorris_morris")
+    #process_delay_obs(t_d=ies_m_d)
+    #exit()
+    plot_morris_delaydif_summary2(ies_m_d,morris_m_d)
+    exit()
+    #t_d = os.path.join("PORT","template_ies_delay_y_nofocus_nospecstate_thickcontrol4")
+    #process_compaction_at_above_obs(t_d)
+    #extract_strain_from_list(os.path.join("GWM_14","template_ies_delay_y_nofocus_nospecstate_test"))
+    #process_strain(os.path.join("GWM_14","template_ies_delay_y_nofocus_nospecstate_test2"))
+    #exit()
+    test_csv_to_csub(os.path.join("D454","template_ies_delay_y_focus_nospecstate_multi-ib3"))
     #extract_delay_results(os.path.join("D454","master_ies_delay_y_nofocus_specstate_newpyemu"))
     #m_d = os.path.join("H201","master_ies_delay_y_nofocus_nospecstate_test4")
     #t_d = os.path.join("H201","template_ies_delay_y_nofocus_nospecstate_test4")
