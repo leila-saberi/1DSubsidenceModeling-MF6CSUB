@@ -1,0 +1,105 @@
+Aquifer,Top,Bot,Thick_ft,Description
+upper aquifer,0,10,10,silty sand
+upper aquifer,10,20,10,sand
+upper aquifer,20,30,10,silty sand
+upper aquifer,30,80,50,sand
+upper aquifer,80,110,30,silty sand
+upper aquifer,110,120,10,sandy clay
+upper aquifer,120,130,10,sand
+upper aquifer,130,190,60,sandy clay
+upper aquifer,190,240,50,sandy clay
+upper aquifer,240,250,10,clay
+upper aquifer,250,280,30,silty sand
+upper aquifer,280,290,10,clay
+upper aquifer,290,300,10,sandy clay
+upper aquifer,300,310,10,silty sand
+upper aquifer,310,320,10,clay
+upper aquifer,320,330,10,sandy clay
+upper aquifer,330,340,10,clay
+upper aquifer,340,350,10,sandy clay
+lower aquifer,350,450,100,clay
+lower aquifer,450,480,30,silty sand
+lower aquifer,480,490,10,silty sand
+lower aquifer,490,500,10,clay
+lower aquifer,500,510,10,sandy clay
+lower aquifer,510,520,10,clay
+lower aquifer,520,530,10,silty sand
+lower aquifer,530,540,10,clay
+lower aquifer,540,560,20,silty sand
+lower aquifer,560,590,30,clay
+lower aquifer,590,600,10,silty sand
+lower aquifer,600,630,30,clay
+lower aquifer,630,640,10,silty sand
+lower aquifer,640,690,50,clay
+lower aquifer,690,700,10,silty sand
+lower aquifer,700,710,10,sandy clay
+lower aquifer,710,750,40,clay
+lower aquifer,750,760,10,silty sand
+lower aquifer,760,770,10,sandy clay
+lower aquifer,770,790,20,clay
+pliocene,790,820,30,silty sand
+pliocene,820,850,30,clay
+pliocene,850,870,20,silty sand
+pliocene,870,890,20,clay
+pliocene,890,910,20,silty sand
+pliocene,910,940,30,clay
+pliocene,940,980,40,clay
+pliocene,980,990,10,silty sand
+pliocene,990,1010,20,sand
+pliocene,1010,1040,30,clay
+pliocene,1040,1060,20,clay
+pliocene,1060,1080,20,clay
+pliocene,1080,1090,10,clay
+pliocene,1090,1130,40,clay
+pliocene,1130,1240,110,clay
+pliocene,1240,1250,10,sandy clay
+pliocene,1250,1350,100,clay
+pliocene,1350,1360,10,silty sand
+pliocene,1360,1370,10,silty sand
+pliocene,1370,1380,10,sandy clay
+pliocene,1380,1390,10,silty sand
+pliocene,1390,1400,10,sandy clay
+pliocene,1400,1410,10,sandy clay
+pliocene,1410,1420,10,clay
+pliocene,1420,1430,10,sandy clay
+pliocene,1430,1440,10,sandy clay
+pliocene,1440,1450,10,sandy clay
+pliocene,1450,1460,10,silty sand
+pliocene,1460,1530,70,sandy clay
+pliocene,1530,1540,10,clay
+pliocene,1540,1550,10,sandy clay
+pliocene,1550,1560,10,silty sand
+pliocene,1560,1570,10,silty sand
+pliocene,1570,1580,10,clay
+pliocene,1580,1590,10,sandy clay
+pliocene,1590,1630,40,silty sand
+pliocene,1630,1640,10,sand
+pliocene,1640,1660,20,silty sand
+pliocene,1660,1670,10,sand
+pliocene,1670,1680,10,silty sand
+pliocene,1680,1690,10,sandy clay
+pliocene,1690,1700,10,silty sand
+pliocene,1700,1710,10,silty sand
+pliocene,1710,1740,30,clay
+pliocene,1740,1750,10,silty sand
+pliocene,1750,1760,10,sandy clay
+pliocene,1760,1780,20,silty sand
+pliocene,1780,1790,10,sandy clay
+pliocene,1790,1800,10,silty sand
+pliocene,1800,1830,30,clay
+pliocene,1830,1840,10,silty sand
+pliocene,1840,1850,10,sand
+pliocene,1850,1860,10,silty sand
+pliocene,1860,1870,10,silty sand
+pliocene,1870,1880,10,sandy clay
+pliocene,1880,1890,10,silty sand
+pliocene,1890,1900,10,silty sand
+pliocene,1900,1910,10,silty sand
+pliocene,1910,1920,10,sand
+pliocene,1920,1930,10,silty sand
+pliocene,1930,1950,20,sandy clay
+pliocene,1950,1960,10,clay
+pliocene,1960,1970,10,sandy clay
+pliocene,1970,1980,10,sandy clay
+pliocene,1980,2000,20,clay
+pliocene,2000,2020,20,sandy clay

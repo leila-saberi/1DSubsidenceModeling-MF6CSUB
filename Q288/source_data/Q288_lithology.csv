@@ -1,0 +1,44 @@
+Aquifer,Top,Bot,Thick_ft,Description
+lower aquifer,0,4,4,top soil
+lower aquifer,4,170,166,sandy clay
+lower aquifer,170,230,60,sand
+lower aquifer,230,350,120,sandy clay
+lower aquifer,350,353,3,sand
+lower aquifer,353,515,162,sandy clay
+lower aquifer,515,520,5,sand
+lower aquifer,520,575,55,sandy clay
+lower aquifer,575,585,10,clay
+lower aquifer,585,589,4,sand
+lower aquifer,589,700,111,sandy clay
+lower aquifer,700,704,4,sand
+lower aquifer,704,726,22,clay
+pliocene,726,783,57,sandy clay
+pliocene,783,862,79,clay
+pliocene,862,868,6,sand
+pliocene,868,918,50,clay
+pliocene,918,962,44,clay
+pliocene,962,968,6,sand
+pliocene,968,1054,86,sandy clay
+pliocene,1054,1100,46,sandy clay
+pliocene,1100,1103,3,sand
+pliocene,1103,1125,22,clay
+pliocene,1125,1159,34,sandy clay
+pliocene,1159,1180,21,clay
+pliocene,1180,1260,80,clay
+pliocene,1260,1264,4,sand
+pliocene,1264,1310,46,clay
+santa margarita,1310,1326,16,clay
+santa margarita,1326,1387,61,clay
+santa margarita,1387,1420,33,clay
+santa margarita,1420,1433,13,sand
+santa margarita,1433,1450,17,clay
+santa margarita,1450,1460,10,sand
+santa margarita,1460,1500,40,clay
+santa margarita,1500,1520,20,sand
+santa margarita,1520,1665,145,clay
+santa margarita,1665,1683,18,sand
+santa margarita,1683,1689,6,clay
+santa margarita,1689,1729,40,fine sand
+santa margarita,1729,1748,19,clay
+santa margarita,1748,1782,34,fine sand
+santa margarita,1782,1824,42,clay

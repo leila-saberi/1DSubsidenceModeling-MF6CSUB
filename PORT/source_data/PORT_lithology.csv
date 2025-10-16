@@ -1,0 +1,221 @@
+Aquifer,Top,Bot,Thick_ft,Description
+Upper,0,20,20,clay
+Upper,30,37,7,sand
+Upper,37,45,8,clay
+Upper,45,52,7,sand
+Upper,52,60,8,clay
+Upper,60,65,5,sand
+Upper,65,70,5,clay
+Upper,70,75,5,sand
+Upper,75,80,5,clay
+Upper,80,90,10,sand
+Upper,97,110,13,clay
+Upper,110,115,5,sand
+Upper,115,120,5,clay
+Upper,120,133,13,sand
+Upper,133,147,14,clay
+Upper,147,175,28,clay
+Upper,175,180,5,sand
+Upper,180,185,5,clay
+Lower,185,186,1,sand
+Lower,186,187,1,clay
+Lower,187,188,1,sand
+Lower,188,190,2,clay
+Lower,190,192,2,sand
+Lower,192,195,3,clay
+Lower,195,197,2,sand
+Lower,197,200,3,clay
+Lower,200,202,2,sand
+Lower,202,205,3,clay
+Lower,205,207,2,sand
+Lower,207,210,3,clay
+Lower,210,212,2,sand
+Lower,212,215,3,clay
+Lower,215,218,3,sand
+Lower,218,221,3,clay
+Lower,221,227,6,clay
+Lower,227,229,2,sand
+Lower,229,231,2,clay
+Lower,231,233,2,sand
+Lower,233,235,2,clay
+Lower,235,238,3,sand
+Lower,238,242,4,clay
+Lower,242,250,8,clay
+Lower,255,257,2,sand
+Lower,257,260,3,clay
+Lower,260,264,4,sand
+Lower,264,268,4,clay
+Lower,268,270,2,sand
+Lower,270,273,3,clay
+Lower,273,278,5,clay
+Lower,278,292,14,clay
+Lower,294,295,1,sand
+Lower,295,296,1,clay
+Lower,296,298,2,sand
+Lower,298,301,3,clay
+Lower,301,303,2,sand
+Lower,303,305,2,clay
+Lower,305,308,3,sand
+Lower,308,311,3,clay
+Lower,311,313,2,sand
+Lower,313,315,2,clay
+Lower,315,317,2,sand
+Lower,317,320,3,clay
+Lower,320,322,2,sand
+Lower,322,325,3,clay
+Lower,325,327,2,sand
+Lower,327,330,3,clay
+Lower,330,332,2,sand
+Lower,332,334,2,clay
+Lower,334,336,2,sand
+Lower,336,338,2,clay
+Lower,338,345,7,clay
+Lower,345,346,1,sand
+Lower,346,348,2,clay
+Lower,348,350,2,sand
+Lower,350,352,2,clay
+Lower,352,353,1,sand
+Lower,353,355,2,clay
+Lower,355,356,1,sand
+Lower,356,358,2,clay
+Lower,358,364,6,sand
+Lower,364,370,6,clay
+Lower,370,376,6,sand
+Lower,376,382,6,clay
+Lower,382,384,2,sand
+Lower,384,386,2,clay
+Lower,386,388,2,sand
+Lower,388,390,2,clay
+Lower,390,393,3,sand
+Lower,393,397,4,clay
+Lower,397,399,2,sand
+Lower,399,402,3,clay
+Lower,402,406,4,sand
+Lower,406,410,4,clay
+Lower,410,416,6,sand
+Lower,416,423,7,clay
+Lower,423,430,7,sand
+Lower,430,438,8,clay
+Lower,438,439,1,clay
+Lower,439,440,1,clay
+Lower,440,445,5,sand
+Lower,445,450,5,clay
+Lower,450,452,2,sand
+Lower,452,455,3,clay
+Lower,455,456,1,clay
+Lower,456,457,1,sand
+Lower,457,458,1,clay
+Lower,458,473,15,sand
+Lower,473,488,15,clay
+Lower,488,518,30,clay
+Lower,518,548,30,sand
+Lower,548,578,30,clay
+Lower,578,608,30,sand
+Lower,608,638,30,clay
+Pliocene,638,668,30,sand
+Pliocene,668,698,30,clay
+Pliocene,698,728,30,sand
+Pliocene,728,758,30,clay
+Pliocene,758,788,30,sand
+Pliocene,788,818,30,clay
+Pliocene,818,848,30,sand
+Pliocene,848,878,30,clay
+Pliocene,878,893,15,sand
+Pliocene,893,894,1,sand
+Pliocene,894,895,1,clay
+Pliocene,895,896,1,sand
+Pliocene,896,897,1,clay
+Pliocene,897,899,2,sand
+Pliocene,899,901,2,clay
+Pliocene,901,1092,191,clay
+Pliocene,1092,1099,7,sand
+Pliocene,1099,1111,12,sand
+Pliocene,1111,1123,12,clay
+Pliocene,1123,1124,1,sand
+Pliocene,1124,1125,1,clay
+Santa Margarita,1125,1181,56,clay
+Santa Margarita,1181,1202,21,sand
+Santa Margarita,1202,1211,9,clay
+Santa Margarita,1211,1230,19,sand
+Santa Margarita,1230,1237,7,sand
+Santa Margarita,1237,1244,7,clay
+Santa Margarita,1244,1249,5,sand
+Santa Margarita,1249,1264,15,clay
+Santa Margarita,1264,1304,40,clay
+Santa Margarita,1304,1317,13,clay
+Santa Margarita,1317,1329,12,sand
+Santa Margarita,1329,1379,50,clay
+Santa Margarita,1379,1381,2,sand
+Santa Margarita,1381,1383,2,clay
+Santa Margarita,1383,1386,3,sand
+Santa Margarita,1386,1389,3,clay
+Santa Margarita,1389,1392,3,sand
+Santa Margarita,1392,1395,3,clay
+Santa Margarita,1395,1398,3,sand
+Santa Margarita,1398,1401,3,clay
+Santa Margarita,1401,1502,101,clay
+Santa Margarita,1502,1503,1,sand
+Santa Margarita,1503,1504,1,clay
+Santa Margarita,1504,1519,15,sand
+Santa Margarita,1519,1535,16,clay
+Santa Margarita,1535,1538,3,sand
+Santa Margarita,1538,1541,3,clay
+Santa Margarita,1541,1549,8,sand
+Santa Margarita,1549,1558,9,clay
+Santa Margarita,1558,1564,6,sand
+Santa Margarita,1564,1570,6,clay
+Santa Margarita,1570,1574,4,sand
+Santa Margarita,1574,1579,5,clay
+Santa Margarita,1579,1588,9,sand
+Santa Margarita,1588,1598,10,clay
+Santa Margarita,1598,1599,1,sand
+Santa Margarita,1599,1601,2,clay
+Santa Margarita,1601,1609,8,sand
+Santa Margarita,1609,1618,9,clay
+Santa Margarita,1618,1630,12,sand
+Santa Margarita,1630,1642,12,clay
+Santa Margarita,1642,1644,2,sand
+Santa Margarita,1644,1646,2,clay
+Santa Margarita,1646,1647,1,sand
+Santa Margarita,1647,1648,1,clay
+Santa Margarita,1648,1650,2,sand
+Santa Margarita,1650,1653,3,clay
+Santa Margarita,1653,1681,28,sand
+Santa Margarita,1681,1710,29,clay
+Santa Margarita,1710,1717,7,sand
+Santa Margarita,1717,1725,8,clay
+Santa Margarita,1725,1726,1,sand
+Santa Margarita,1726,1728,2,clay
+Santa Margarita,1728,1733,5,sand
+Santa Margarita,1733,1739,6,clay
+Santa Margarita,1739,1743,4,sand
+Santa Margarita,1743,1748,5,clay
+Santa Margarita,1748,1756,8,sand
+Santa Margarita,1756,1764,8,clay
+Santa Margarita,1764,1775,11,sand
+Santa Margarita,1775,1787,12,clay
+Santa Margarita,1787,1802,15,sand
+Santa Margarita,1802,1818,16,clay
+Santa Margarita,1818,1821,3,sand
+Santa Margarita,1821,1825,4,clay
+Santa Margarita,1825,1827,2,sand
+Santa Margarita,1827,1830,3,clay
+Santa Margarita,1830,1831,1,sand
+Santa Margarita,1831,1833,2,clay
+Santa Margarita,1833,1835,2,sand
+Santa Margarita,1835,1837,2,clay
+Santa Margarita,1837,1838,1,sand
+Santa Margarita,1838,1840,2,clay
+Santa Margarita,1840,1843,3,sand
+Santa Margarita,1843,1847,4,clay
+Santa Margarita,1847,1851,4,sand
+Santa Margarita,1851,1855,4,clay
+Santa Margarita,1855,1868,13,sand
+Santa Margarita,1868,1881,13,clay
+Santa Margarita,1881,1895,14,sand
+Santa Margarita,1895,1909,14,clay
+Santa Margarita,1909,1919,10,sand
+Santa Margarita,1919,1929,10,clay
+Santa Margarita,1929,1949,20,sand
+Santa Margarita,1949,1969,20,clay
+Santa Margarita,1969,1974,5,sand
