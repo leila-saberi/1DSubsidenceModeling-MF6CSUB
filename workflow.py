@@ -9,7 +9,7 @@ sys.path.insert(0,os.path.abspath(os.path.join('dependencies')))
 import pyemu
 import model_functions
 import ies_functions
-import pastas_workflow
+
 
 
 def _prep(site_name,use_delay,org_dir,num_reals,obs_file,tpl_dir,
