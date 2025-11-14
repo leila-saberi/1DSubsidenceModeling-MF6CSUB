@@ -9,11 +9,12 @@ This release provides a fully functional 1D subsidence modeling framework for 39
 
 - Calibration Workflow: A complete PEST-PyEMU calibration pipeline (via workflow.py and ies-functions.py) to minimize error between simulated and observed subsidence using:
 
+ - Spirit leveling data
+ - GPS data
  - InSAR data
-
  - Extensometer data
-
  - Historical groundwater levels
+ - 
 # Pre-processing and Data Handling: 
 - Scripts (prep_data.py, model_functions.py) for:
 
