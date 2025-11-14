@@ -8,17 +8,14 @@ import pandas as pd
 
 sys.path.insert(0, os.path.join("..", "dependencies"))
 
-name_k_dict = {"upper": 0, "lower": 1}
-
-from matplotlib.backends.backend_pdf import PdfPages
-
 
 def prep_data(use_delay, **kwargs):
     from dependencies.project_functions.interbed_functions import interbed_thicknesses
     from dependencies.project_functions.layer_functions import layer_thicknesses
 
     w_d = "."
-    location = "V54_RESET"
+    location = "Y88"
+
     if os.path.exists("processed_data"):
         shutil.rmtree("processed_data")
     os.makedirs("processed_data")
@@ -28,7 +25,6 @@ def prep_data(use_delay, **kwargs):
     )
     par_data = par_data.loc[:, ["parameter", "Upper", "Corcoran", "Lower"]]
     par_data.index = par_data.pop("parameter").values
-    par_data.dropna(inplace=True)
 
     obs = pd.read_csv(
         os.path.join(w_d, "source_data", "{0}_obs_data.csv".format(location)),
@@ -44,16 +40,23 @@ def prep_data(use_delay, **kwargs):
     )
     lith.Aquifer = lith.Aquifer.str.lower()
     lay_df = pd.DataFrame(columns=lith.Aquifer.unique())
+
     nlay = 3
 
-    k_vals = [10.0 for _ in range(nlay)]
-    k33_vals = [0.01 for _ in range(nlay)]
+    k_vals = [60] * len(lay_df.columns)  # from: J.Ellis Kh:10-100 ft/d, K33/K: 50-1000
+    k33_vals = [0.01] * len(
+        lay_df.columns
+    )  # from: J.Ellis Kh:10-100 ft/d, K33/K: 50-1000
+
+    th_aq_dict = {"upper aquifer": 1, "corcoran": 2, "lower aquifer": 3}
 
     interpolated_obs_dfs = []
+
     uaq = ["Upper", "Lower"]
     uk = [0, 2]
     top = None
-    for k, aq in zip(uk, uaq):
+
+    for k, aq in enumerate(uaq):
         aobs = obs.loc[obs.Aquifer == aq, ["Alt"]].copy()
         print(aobs.loc[aobs.index.duplicated()])
         if aobs.loc[aobs.index.duplicated()].shape[0] > 0:
@@ -64,34 +67,41 @@ def prep_data(use_delay, **kwargs):
         if "wl_func" in kwargs:
             aobs_interp["interpolated"] = kwargs["wl_func"](aobs_interp["interpolated"])
         aobs_interp["Aquifer"] = aq
-        aobs_interp["klayer"] = k
+        lay = [th_aq_dict[n] for n in th_aq_dict if aq.strip().lower() in n]
+        assert len(lay) == 1, str(lay)
+        aobs_interp["klayer"] = lay[0] - 1
         interpolated_obs_dfs.append(aobs_interp)
-
-    # if top is None:
-    top = (obs.Alt).max()
+        if k == 0:
+            aobs = obs.loc[obs.Aquifer == aq, :]
+            top = (aobs.BLS + aobs.Alt).max()
+    if top is None:
+        top = (obs.BLS + obs.Alt).max()
 
     tsdf = pd.concat(interpolated_obs_dfs)
-
+    tsdf.to_csv(os.path.join(w_d, "processed_data", "{0}.ts_data.csv".format(location)))
     fig, axes = plt.subplots(len(uaq), 1, figsize=(10, 10))
 
     for ax, aq in zip(axes, uaq):
         if aq == "Composite":
             continue
+
         uobs = obs.loc[obs.Aquifer == aq, :].copy()
         uobs.sort_index(inplace=True)
         print(aq, obs.columns, tsdf.columns)
         ax.scatter(uobs.index, uobs["Alt"], marker=".", c="r", label="raw", alpha=0.5)
         ax.plot(uobs.index, uobs["Alt"], "r-", label="raw", alpha=0.5)
         pobs = tsdf.loc[tsdf.Aquifer == aq, :].copy()
+        print(aq, pobs)
         pobs.sort_index(inplace=True)
         # ax.scatter(uobs.index,uobs.Alt,marker='o',s=20,c='m',alpha=0.5,label="processed")
         ax.plot(pobs.index, pobs.interpolated.values, "m-", label="processed")
-        ax.set_title(aq, loc="left")
+        ax.set_title(
+            "aquifer:{0}, klayer:{1}".format(aq, pobs.klayer.iloc[0]), loc="left"
+        )
         ax.legend(loc="upper right")
     plt.tight_layout()
     plt.savefig(os.path.join(w_d, "processed_data", "processed_gwlevels.pdf"))
     plt.close(fig)
-    tsdf.to_csv(os.path.join(w_d, "processed_data", "{0}.ts_data.csv".format(location)))
 
     cg_theta = [0.3 for _ in range(nlay)]
     cg_ske_cr = par_data.loc["cg_ske_cr", :].values
@@ -100,7 +110,7 @@ def prep_data(use_delay, **kwargs):
     ib_kv = par_data.loc["ib_kv", :].values
     sgm = 1.7
     sgs = 2.0
-    theta = 0.35
+    theta = 0.4
     h0 = 0.0
 
     if use_delay:
@@ -110,7 +120,7 @@ def prep_data(use_delay, **kwargs):
     else:
         lay_df.loc["cdelay", :] = "nodelay"
 
-    # top = (obs.BLS + obs.Alt).max()  # ?  what is going here???
+    top = (obs.Alt).max()  # ?  what is going here???
 
     # set dataframe entries that are known at this point
     lay_df.loc["pcs0", :] = par_data.loc["pcs0", :].values
@@ -158,9 +168,9 @@ def modify_pst(tpl_dir):
     ]
     assert cobs3.shape[0] > 0
     cobs3.sort_values(by="datetime", inplace=True)
-    obs.loc[cobs3.index, "obsval"] = 70
+    obs.loc[cobs3.index, "obsval"] = 50
     obs.loc[cobs3.index, "standard_deviation"] = 2.5
-    obs.loc[cobs3.index, "obgnme"] = "prefer-compact3"
+    obs.loc[cobs3.index, "obgnme"] = "greater_than-compact3"
     obs.loc[cobs3.index, "weight"] = 100.0
 
     phi_file = pst.pestpp_options.get("ies_phi_factor_file", None)
@@ -171,7 +181,7 @@ def modify_pst(tpl_dir):
 
         if "less_than_rebound" not in df.tag.values:
             df.index = df.pop("tag")
-            df.loc["prefer-compact3", "prop"] = 1
+            df.loc["greater_than-compact3", "prop"] = 1.0
             df.to_csv(os.path.join(tpl_dir, phi_file), header=False)
 
     pst.control_data.noptmax = -2
