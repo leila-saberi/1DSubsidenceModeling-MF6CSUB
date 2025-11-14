@@ -14,7 +14,7 @@ This release provides a fully functional 1D subsidence modeling framework for 39
  - InSAR data
  - Extensometer data
  - Historical groundwater levels
- - 
+   
 # Pre-processing and Data Handling: 
 - Scripts (prep_data.py, model_functions.py) for:
 
