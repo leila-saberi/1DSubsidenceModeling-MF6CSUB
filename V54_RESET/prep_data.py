@@ -18,7 +18,7 @@ def prep_data(use_delay, **kwargs):
     from dependencies.project_functions.layer_functions import layer_thicknesses
 
     w_d = "."
-    location = "V54_RESET"
+    location = "V54_RESETshallow"
     if os.path.exists("processed_data"):
         shutil.rmtree("processed_data")
     os.makedirs("processed_data")

@@ -8,15 +8,13 @@ import pandas as pd
 
 sys.path.insert(0, os.path.join("..", "dependencies"))
 
-name_k_dict = {"upper": 0, "lower": 1}
-
 
 def prep_data(use_delay, **kwargs):
     from dependencies.project_functions.interbed_functions import interbed_thicknesses
     from dependencies.project_functions.layer_functions import layer_thicknesses
 
     w_d = "."
-    location = "199.022"
+    location = "376.676_lay2"
     if os.path.exists("processed_data"):
         shutil.rmtree("processed_data")
     os.makedirs("processed_data")
@@ -24,10 +22,10 @@ def prep_data(use_delay, **kwargs):
     par_data = pd.read_excel(
         os.path.join(w_d, "source_data", "{0}_par_data.xlsx".format(location))
     )
-    par_data.columns = par_data.columns.str.strip()
-    par_data = par_data.loc[:, ["parameter", "Upper", "Corcoran", "Lower"]]
+    par_data = par_data.loc[:, ["parameter", "Upper", "Lower"]]
     par_data.index = par_data.pop("parameter").values
-
+    par_data.dropna(inplace=True)
+    # print(par_data)
     obs = pd.read_csv(
         os.path.join(w_d, "source_data", "{0}_obs_data.csv".format(location)),
         index_col=0,
@@ -42,14 +40,14 @@ def prep_data(use_delay, **kwargs):
     )
     lith.Aquifer = lith.Aquifer.str.lower()
     lay_df = pd.DataFrame(columns=lith.Aquifer.unique())
-    nlay = 3
-
+    nlay = 2
+    # print(lay_df)
     k_vals = [10.0 for _ in range(nlay)]
     k33_vals = [0.01 for _ in range(nlay)]
 
     interpolated_obs_dfs = []
     uaq = ["Upper", "Lower"]
-    uk = [0, 2]
+    uk = [0, 1]
     top = None
     for k, aq in zip(uk, uaq):
         aobs = obs.loc[obs.Aquifer == aq, ["Alt"]].copy()
@@ -65,11 +63,13 @@ def prep_data(use_delay, **kwargs):
         aobs_interp["klayer"] = k
         interpolated_obs_dfs.append(aobs_interp)
         # if k == 0:
-        #    aobs = obs.loc[obs.Aquifer==aq,:]
-        #    top = max(aobs.BLS.max(),(aobs.BLS + aobs.Alt).max())
+        # aobs = obs.loc[obs.Aquifer==aq,:]
+        # top = (aobs.BLS + aobs.Alt).max()
     # if top is None:
-    top = (obs.Alt).max()  # (obs.BLS + obs.Alt).max()
-
+    top = (
+        obs.Alt
+    ).max()  # (obs.BLS + obs.Alt).max() can remove obs.BLS or add 0 in the obs file
+    # print("top: ", top)
     tsdf = pd.concat(interpolated_obs_dfs)
 
     fig, axes = plt.subplots(len(uaq), 1, figsize=(10, 10))
@@ -107,10 +107,10 @@ def prep_data(use_delay, **kwargs):
         lay_df.loc["cdelay", :] = ["nodelay"] + [
             "delay" for _ in range(len(lay_df.columns) - 1)
         ]
-        # lay_df.loc['cdelay',:] = 'delay'
     else:
         lay_df.loc["cdelay", :] = "nodelay"
 
+    # top = (obs.BLS + obs.Alt).max()  # ?  what is going here???
     # set dataframe entries that are known at this point
     lay_df.loc["pcs0", :] = par_data.loc["pcs0", :].values
     lay_df.loc["h0", :] = h0
@@ -132,113 +132,23 @@ def prep_data(use_delay, **kwargs):
     # interbed thickness data
     quantiles = kwargs.pop("quantiles", None)
     lay_df = interbed_thicknesses(lay_df, lith, quantiles, use_delay)
-    lay_df.loc["top", :] += 100
 
     lay_df.columns = np.arange(nlay, dtype=int)
     lay_df.index.name = "property"
-    print(lay_df)
+    print("layer:", lay_df)
 
     lay_df.to_csv(
         os.path.join(w_d, "processed_data", f"{location}.model_property_data.csv")
     )
 
 
-def prep_scenario_csv():
-    location = "199.022"
-    # scenarios = "{0}_CH_forecast.xlsx".format(location)
-    # scenarios = "{0}_scenario_data_2015.xlsx".format(location)
-    # scenarios = "{0}_scenario_data.xlsx".format(location)
-    scenarios = "{0}_MTNoMO_scenario_data.xlsx".format(location)
-    scen_df = pd.read_excel(os.path.join("source_data", scenarios), header=None)
-    # the zero based col for scenario dates
-    date_j = 0
-    if "CH_forecast" in scenarios:
-        scenario_js = [
-            [1, 2],
-            [3, 4],
-            [5, 6],
-        ]  # the nested zero-based cols for scenario data
-        # the zero-based model layers that the scenario data columns map to
-        kvals = [2]
-    elif "2015" in scenarios:
-        scenario_js = [[1, 2]]
-        kvals = [0, 2]
-    elif "MTNoMO" in scenarios:
-        scenario_js = [[1, 2]]
-        kvals = [0, 2]
-    else:
-        scenario_js = [[1, 2], [3, 4], [5, 6], [11, 12]]  # _scenario_data
-        kvals = [0, 2]
-    # try to make some better scenario names
-    scen_names = [scen_df.iloc[1, sjs[0]] for sjs in scenario_js]
-    scen_names = [
-        sn.lower().replace(" ", "-").replace("_", "-").replace("(", "").replace(")", "")
-        for sn in scen_names
-    ]
-    # print(scen_names)
-
-    # zero-based row where dates/data start
-    start_i = 3
-
-    dates = pd.to_datetime(scen_df.iloc[3:, date_j])
-    # print(dates)
-    scen_dict = {}
-    if "CH_forecast" in scenarios:
-        scenario_js = [[2], [4], [6]]
-    for name, js in zip(scen_names, scenario_js):
-        vals = scen_df.iloc[start_i:, js].values
-        # print(vals)
-
-        assert vals.shape[1] == len(kvals)
-        for k, v in zip(kvals, vals.transpose()):
-            # print(v)
-            # exit()
-            sname = name + "_k:{0}".format(k)
-            assert sname not in scen_dict
-            scen_dict[sname] = v
-    # print(scen_dict)
-
-    scen_df = pd.DataFrame(scen_dict, index=dates)
-    scen_df.index.name = "datetime"
-    scen_df.to_csv(os.path.join("processed_data", "{0}.scenarios.csv".format(location)))
-
-
 def modify_pst(tpl_dir):
+    return
     import pyemu
 
     pst = pyemu.Pst(os.path.join(tpl_dir, "pest.pst"))
-    obs = pst.observation_data
-
-    cobs = obs.loc[obs.usecol.str.startswith("percentcomp."), :].copy()
-    cobs["layer"] = cobs.usecol.apply(lambda x: int(x.split(".")[1]))
-    cobs["datetime"] = pd.to_datetime(cobs.datetime)
-    cobs3 = cobs.loc[
-        cobs.apply(lambda x: x.datetime.year == 2024 and x.layer == 3, axis=1), :
-    ]
-    assert cobs3.shape[0] > 0
-    cobs3.sort_values(by="datetime", inplace=True)
-    obs.loc[cobs3.index, "obsval"] = 70
-    obs.loc[cobs3.index, "standard_deviation"] = 2.5
-    obs.loc[cobs3.index, "obgnme"] = "prefer-compact3"
-    obs.loc[cobs3.index, "weight"] = 100.0
-
-    phi_file = pst.pestpp_options.get("ies_phi_factor_file", None)
-    if phi_file is not None:
-        df = pd.read_csv(
-            os.path.join(tpl_dir, phi_file), header=None, names=["tag", "prop"]
-        )
-
-        if "less_than_rebound" not in df.tag.values:
-            df.index = df.pop("tag")
-            df.loc["prefer-compact3", "prop"] = 1
-            df.to_csv(os.path.join(tpl_dir, phi_file), header=False)
-
-    pst.control_data.noptmax = -2
-    pst.write(os.path.join(tpl_dir, "pest.pst"), version=2)
 
 
 if __name__ == "__main__":
-    # os.chdir(os.path.dirname(os.path.abspath(__file__)))
-    os.chdir("199.022")
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
     prep_data(True)
-    # prep_scenario_csv()

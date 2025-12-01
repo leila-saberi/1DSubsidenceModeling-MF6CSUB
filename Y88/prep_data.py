@@ -14,7 +14,7 @@ def prep_data(use_delay, **kwargs):
     from dependencies.project_functions.layer_functions import layer_thicknesses
 
     w_d = "."
-    location = "Y88"
+    location = "Y88_lay3"
 
     if os.path.exists("processed_data"):
         shutil.rmtree("processed_data")
