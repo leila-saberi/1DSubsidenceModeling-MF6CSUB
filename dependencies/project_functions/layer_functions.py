@@ -4,7 +4,8 @@ def layer_thicknesses(lay_df, lith, top):
     last = top
     for aq in lay_df.columns:
         t = lith.loc[lith.Aquifer == aq, "Thick_ft"].sum()
-        b = last - lith.loc[lith.Aquifer == aq, "Bot"].max()
+        # b = last - lith.loc[lith.Aquifer == aq, "Bot"].max()
+        b = last - t
         lay_df.loc["tot_thick", aq] = t
         lay_df.loc["thk", aq] = t
         botm.append(b)
