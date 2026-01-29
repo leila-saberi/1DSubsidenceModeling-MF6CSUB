@@ -70,6 +70,9 @@ def main(
         quantiles = [[0.1, 0.25, 0.33, 0.66, 0.75, 0.9], [0.1, 0.25, 0.33, 0.66, 0.75, 0.9]]
         exp_tags = [f"_{date_string}", f"_{date_string}"]
 
+        if site_name in ["376.676_lay2", "438.939_lay2", "N200", "J859", "K852"]:
+            use_focus_weights = False
+
         scenariofiles = ["CH_forecast", "DWR_scenarios", "2015_scenario"] #This allows you to run the scenarios
 
         for pref, ib, quants, exp_tag in zip(prefer_less_rebound, ibtie, quantiles, exp_tags):
