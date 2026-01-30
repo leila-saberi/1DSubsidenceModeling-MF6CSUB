@@ -1,8 +1,8 @@
-Folder Structure and Contents
+Folder Structure and Contents/
 
 This folder contains the full set of input data, preprocessing script, and model outputs used to develop and calibrate the one-dimensional MODFLOW 6–CSUB subsidence models. The directory structure is organized to separate raw and scenario-specific input data, simulation outputs, and calibrated parameter outputs in a transparent and reproducible manner.
 
-Source_data:
+Source_data:/
 The Source_data directory contains all primary model input files required to run the 1D MODFLOW 6–CSUB simulations. These files define the hydrostratigraphy, groundwater-level forcing, subsidence observations, and parameter values used during model calibration and scenario evaluation.
 
 - The CH_forecast spreadsheet contains groundwater-level input files used for predictive simulations designed to evaluate subsidence response relative to the estimated critical head. These inputs are used to assess future subsidence under groundwater levels maintained at and above the modeled critical head threshold.
