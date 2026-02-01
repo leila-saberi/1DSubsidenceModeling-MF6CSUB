@@ -71,11 +71,14 @@ The **prep_data.py** script automates preprocessing of model input data.
 
 This folder contains spreadsheets summarizing modeled and observed subsidence results.
 
-- Includes simulated cumulative subsidence for:
-  - Calibrated (base) model
-  - Critical Head
-  - Critical Head +20 ft
-  - Critical Head +50 ft
-  - Historical Low
-  - 2015 water-level conditions
-- Includes observed subsidence time series for comparison with modeled results.
+- Simulated Subsidence Spreadsheet:
+	- Includes simulated cumulative subsidence for:
+	  - Calibrated (base) model
+	  - Critical Head
+	  - Critical Head +20 ft
+	  - Critical Head +50 ft
+	  - Historical Low
+	  - 2015 water-level conditions
+	- Includes observed subsidence time series for comparison with modeled results.
+- Mean CH Spreadsheet:
+	- Includes the estimated average Critical Head (CH) of the primary aquifer.
