@@ -1,5 +1,5 @@
 # Overview 
-This release provides a fully functional 1D subsidence modeling framework for 49 benchmark sites in California’s Central Valley, developed using MODFLOW 6 with the CSUB package. The repository integrates PEST-PyEMU for ensemble-based data assimilation and model calibration, enabling robust estimation of critical heads and projection of future subsidence under various groundwater management scenarios. Of the 49 sites, 47 were modeled using the Multi-Interbed setting and 2 using the Single-Interbed setting. Inputs and outputs for the 46 Multi-Interbed sites are available under the Multi-IB branch, while the remaining two sites can be found under the Single-IB branch.
+This release provides a fully functional 1D subsidence modeling framework for 50 benchmark sites in California’s Central Valley, developed using MODFLOW 6 with the CSUB package. The repository integrates PEST-PyEMU for ensemble-based data assimilation and model calibration, enabling robust estimation of critical heads and projection of future subsidence under various groundwater management scenarios. Of the 50 sites, 48 were modeled using the Multi-Interbed setting and 2 using the Single-Interbed setting. Inputs and outputs for the 48 Multi-Interbed sites are available under the Multi-IB branch, while the remaining two sites can be found under the Single-IB branch.
 
 # Key Features:
 
